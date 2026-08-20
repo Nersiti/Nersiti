@@ -24,8 +24,10 @@
 
 ## Требования
 - Python 3.11
-- [Ollama](https://ollama.com) + модель, напр. `ollama pull qwen2.5:7b-instruct`
-  (или `dolphin-mistral:7b` для варианта без цензуры).
+- [Ollama](https://ollama.com). Готовую модель ставит скрипт (обучать НЕ нужно):
+  `scripts/setup_model.ps1` (Windows) или `scripts/setup_model.sh` (Linux) —
+  он делает `ollama pull qwen2.5:7b-instruct` и `ollama pull bge-m3`.
+  Для варианта «без ограничений» — `dolphin-mistral:7b` (см. коммент в скрипте).
 - `api_id` / `api_hash` с https://my.telegram.org
 - Железо-ориентир: RTX 5060 8 GB / 16 GB RAM / Ryzen 5 5500 — тянет одну
   квантованную 7–8B модель в Q4.
@@ -36,6 +38,8 @@ python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env            # вписать TG_API_ID/HASH и пароль панели
 cp config.example.yaml config.yaml   # указать storage.data_dir (другой диск), модель, web
+# один раз поставить готовую модель (обучение не нужно):
+pwsh scripts/setup_model.ps1         # Windows;  на Linux: bash scripts/setup_model.sh
 python run.py                   # первый запуск — вход в Telegram по коду
 ```
 Панель: http://127.0.0.1:8765
@@ -43,10 +47,9 @@ python run.py                   # первый запуск — вход в Tele
 ## Про «без ограничений» и «самообучение»
 - «Без ограничений» = выбор uncensored-модели в Ollama, отдельной тренировки
   для этого не нужно.
-- «Самообучение» реализуется реалистично: редактируемая память/персона +
-  опциональный ручной LoRA под твой стиль (`scripts/finetune_lora.md`).
-  Модель **не переписывает свои веса на лету** — на этом железе это нереально
-  и небезопасно.
+- Обучать НИЧЕГО не нужно — берём готовую модель. Адаптация под тебя идёт
+  «мягко»: редактируемая память/персона (`persona.md`) + опциональный RAG по
+  архиву. Веса модели не меняются.
 
 ## Важно (правила Telegram)
 Автоматизация действий от личного аккаунта (userbot) — серая зона правил
