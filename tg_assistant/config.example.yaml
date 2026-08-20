@@ -1,13 +1,30 @@
 # Скопируйте в config.yaml и настройте под себя.
 
+# ГДЕ ХРАНИТЬ ВСЁ (база, медиа, сессия, память).
+# Укажите путь на ДРУГОМ диске вашего ПК.
+storage:
+  data_dir: "D:/nersiti_data"      # Windows: другой диск. Linux: "/mnt/disk2/nersiti_data"
+  # Внутри создаются: archive.db, media/<chat_id>/<yyyy-mm>/, session.session, persona.md
+
 ai:
   provider: ollama
   base_url: "http://127.0.0.1:11434"
-  model: "qwen2.5:7b-instruct"   # или dolphin-mistral:7b (uncensored), saiga...
+  # Разговорная модель с поддержкой инструментов (function calling):
+  model: "qwen2.5:7b-instruct"     # хорошо по-русски и умеет tools; альт.: llama3.1:8b
   embed_model: "bge-m3"
   temperature: 0.7
   max_tokens: 512
   context_messages: 20
+  use_tools: true                  # разрешить модели ходить в интернет (см. web)
+
+# ДОСТУП В ИНТЕРНЕТ для локальной модели (инструменты web_search/web_fetch)
+web:
+  enabled: true
+  search_provider: "duckduckgo"    # duckduckgo (без ключа) | searxng | tavily
+  searxng_url: "http://127.0.0.1:8080"   # если search_provider: searxng
+  tavily_api_key: ""               # если search_provider: tavily
+  max_results: 5
+  fetch_timeout_sec: 15
 
 archive:
   save_media: true
@@ -23,4 +40,4 @@ autoreply:
   typing_simulation: true
 
 semantic_search:
-  enabled: false                     # включить RAG-память (нагрузка на CPU)
+  enabled: false                     # RAG-память по архиву (нагрузка на CPU)

@@ -16,7 +16,18 @@
 - умеет отвечать за пользователя с помощью ЛОКАЛЬНОЙ модели (Ollama);
 - управляется через локальную веб-панель (FastAPI) на localhost.
 
-Мозг — только локальный (Ollama). Никаких облачных вызовов.
+ВАЖНО ПО ПРИОРИТЕТАМ: ядро продукта — сам Telegram-софт (архив всего +
+управление + автоответ). Нейросеть — ПОДКЛЮЧАЕМЫЙ модуль-помощник, а не
+центр системы. Архив и панель должны работать даже если модель выключена.
+
+Мозг — локальный (Ollama), НО с доступом в интернет через инструменты
+(web_search / web_fetch, см. §7a). Веса модели — локальные; наружу уходят
+только веб-запросы, которые модель делает осознанно через инструменты.
+
+ГДЕ ХРАНИТСЯ ВСЁ: корень данных задаётся в config `storage.data_dir` и
+указывает на ОТДЕЛЬНЫЙ диск ПК пользователя (напр. `D:/nersiti_data`).
+Везде ниже, где написано `data/...`, подразумевается `storage.data_dir/...`.
+Все пути (БД, media, сессия, persona.md, логи) строятся от этого корня.
 
 ## 1. Железо и модель (ограничения, из них всё вытекает)
 
@@ -39,10 +50,12 @@
 - Ollama (локальный LLM-сервер, HTTP на 127.0.0.1:11434)
 - SQLite + FTS5 (архив + полнотекстовый поиск), модуль sqlite3 из stdlib
 - FastAPI + Uvicorn (веб-панель), Jinja2 (шаблоны)
-- httpx (запросы к Ollama)
+- httpx (запросы к Ollama и web_fetch)
 - pydantic / pydantic-settings (конфиг)
 - PyYAML (per-chat настройки)
+- ddgs (поиск DuckDuckGo без ключа) + trafilatura (извлечение текста страниц)
 - (опционально) sqlite-vec или chromadb — векторный поиск
+- (опционально) SearXNG — локальный приватный поисковик
 
 ## 3. Структура проекта
 
@@ -65,9 +78,10 @@ tg_assistant/
       media.py               # скачивание и хранение файлов на диск
       search.py              # поиск: FTS5 (+ опц. векторный)
     ai/
-      ollama_client.py       # клиент к Ollama (generate/chat/embeddings)
+      ollama_client.py       # клиент к Ollama (generate/chat/embeddings, tools)
       persona.py             # редактируемая персона + память
-      reply.py               # сборка промпта из истории -> генерация ответа
+      reply.py               # промпт из истории + цикл tool-calling -> ответ
+      tools.py               # доступ в интернет: web_search / web_fetch
       embeddings.py          # опц. семантическая память (RAG)
     autoreply/
       rules.py               # per-chat настройки и режимы (модель данных)
@@ -81,12 +95,15 @@ tg_assistant/
     finetune_lora.md         # инструкция по опциональному LoRA (не код)
   docs/
     PLAN.md                  # этот файл
-data/ (создаётся при запуске, в .gitignore)
+<storage.data_dir>/  (ОТДЕЛЬНЫЙ диск ПК, напр. D:/nersiti_data; НЕ в репозитории)
   archive.db                 # база
   media/<chat_id>/<yyyy-mm>/ # файлы
   session.session           # сессия Telethon
   persona.md                # редактируемая персона/память
+  app.log                    # логи
 ```
+Все пути формируются от `storage.data_dir` (config). Директории создаются
+при первом запуске. На этом диске должно быть достаточно места под медиа.
 
 ## 4. Конфигурация
 
@@ -101,14 +118,26 @@ DASHBOARD_PORT=8765
 
 ### config.yaml (поведение)
 ```yaml
+storage:
+  data_dir: "D:/nersiti_data"   # ОТДЕЛЬНЫЙ диск. Linux: "/mnt/disk2/nersiti_data"
+
 ai:
   provider: ollama
   base_url: "http://127.0.0.1:11434"
-  model: "qwen2.5:7b-instruct"
+  model: "qwen2.5:7b-instruct"  # разговорная + умеет tools (function calling)
   embed_model: "bge-m3"
   temperature: 0.7
   max_tokens: 512
   context_messages: 20        # сколько последних сообщений давать в контекст
+  use_tools: true             # разрешить модели ходить в интернет (см. web)
+
+web:                          # доступ в интернет для модели (§7a)
+  enabled: true
+  search_provider: "duckduckgo"   # duckduckgo | searxng | tavily
+  searxng_url: "http://127.0.0.1:8080"
+  tavily_api_key: ""
+  max_results: 5
+  fetch_timeout_sec: 15
 
 archive:
   save_media: true
@@ -208,7 +237,7 @@ db.py экспортирует: `init_db(path)`, `get_conn()`, `upsert_chat(...)
   (autoreply.min/max_delay_sec), отправить.
 - `async send_draft_now(draft_id)` — берёт черновик из БД и отправляет.
 
-## 7. AI-слой (только Ollama)
+## 7. AI-слой (локальный Ollama + доступ в интернет)
 
 ### ai/ollama_client.py
 Тонкий httpx-клиент к локальному Ollama:
@@ -229,8 +258,41 @@ db.py экспортирует: `init_db(path)`, `get_conn()`, `upsert_chat(...)
   2) (опц.) через embeddings.py достать релевантные старые фрагменты (RAG);
   3) собрать messages для `chat`: system = персона + инструкция режима,
      далее история, далее новое сообщение;
-  4) вызвать ollama_client.chat; вернуть текст.
+  4) ЕСЛИ `ai.use_tools` и `web.enabled` → запустить ЦИКЛ TOOL-CALLING (§7a);
+     иначе обычный вызов ollama_client.chat;
+  5) вернуть финальный текст.
 - Функция чистая относительно отправки: только генерирует строку.
+
+## 7a. Доступ в интернет (ai/tools.py + цикл в reply.py)
+
+Смысл: локальная модель «умная в общении» И может достать свежую инфу из
+сети, когда это нужно (новости, факты, ссылки). Веса — локальные; наружу
+идут только веб-запросы, инициированные моделью через инструменты.
+
+### ai/tools.py
+- `async web_search(query, max_results) -> list[{title,url,snippet}]`
+  провайдер из `web.search_provider`:
+    - `duckduckgo` — библиотека ddgs, без ключа (дефолт);
+    - `searxng` — GET на `web.searxng_url` (локальный, приватный);
+    - `tavily` — API с ключом `web.tavily_api_key`.
+- `async web_fetch(url, timeout) -> str` — httpx GET → trafilatura.extract
+  → основной текст (обрезать до разумного лимита символов).
+- `TOOLS_SPEC` — описания инструментов в формате Ollama `tools`
+  (name, description, parameters JSON-schema).
+- `async run_tool_call(name, arguments) -> str` — диспетчер имя→функция,
+  результат сериализуется в строку для возврата модели.
+
+### Цикл tool-calling (в reply.py)
+1. Вызов `ollama_client.chat(messages, tools=TOOLS_SPEC)`.
+2. Если ответ содержит `tool_calls` → для каждого выполнить
+   `run_tool_call(...)`, добавить результат как message role="tool",
+   снова вызвать chat. Повторять до финального ответа без tool_calls.
+3. Ограничить число итераций (напр. 3), чтобы не зациклиться.
+4. Если `web.enabled=false` — tools не передаём, модель работает офлайн.
+
+Безопасность/приватность: web_fetch с таймаутом, лимитом размера и
+белым/чёрным списком доменов при желании; поиск можно направить в
+локальный SearXNG, чтобы запросы не уходили в сторонние сервисы.
 
 ### ai/embeddings.py (опционально, включается флагом)
 - Индексирует сообщения (эмбеддинги в отдельной таблице/векторном хранилище),
