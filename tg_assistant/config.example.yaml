@@ -1,0 +1,26 @@
+# Скопируйте в config.yaml и настройте под себя.
+
+ai:
+  provider: ollama
+  base_url: "http://127.0.0.1:11434"
+  model: "qwen2.5:7b-instruct"   # или dolphin-mistral:7b (uncensored), saiga...
+  embed_model: "bge-m3"
+  temperature: 0.7
+  max_tokens: 512
+  context_messages: 20
+
+archive:
+  save_media: true
+  save_deleted: true
+  save_edits: true
+
+autoreply:
+  default_mode: "off"                # off | draft | auto
+  default_auto_submode: "generate"   # preset | generate | dialogue
+  default_preset_text: "Привет! Отвечу чуть позже."
+  min_delay_sec: 3
+  max_delay_sec: 12
+  typing_simulation: true
+
+semantic_search:
+  enabled: false                     # включить RAG-память (нагрузка на CPU)

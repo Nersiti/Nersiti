@@ -1,0 +1,12 @@
+# секреты и данные — никогда не коммитим
+.env
+config.yaml
+/data/
+*.session
+*.session-journal
+
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
