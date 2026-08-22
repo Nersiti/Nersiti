@@ -20,6 +20,12 @@
 управление + автоответ). Нейросеть — ПОДКЛЮЧАЕМЫЙ модуль-помощник, а не
 центр системы. Архив и панель должны работать даже если модель выключена.
 
+КЛИЕНТ: выбран МОД Telegram для Android (см. docs/PLAN_MOD_ANDROID.md).
+Этот файл (PLAN.md) описывает БЭКЕНД-МОЗГ на ПК: Ollama, архив, поиск,
+движок автоответа, веб-панель и sync-API для приёма данных с телефона
+(§6b). Модуль telegram/ (userbot) остаётся как опциональный/резервный
+способ сбора; основной источник данных — мод-клиент через sync-API.
+
 Мозг — локальный (Ollama), НО с доступом в интернет через инструменты
 (web_search / web_fetch, см. §7a). Веса модели — локальные; наружу уходят
 только веб-запросы, которые модель делает осознанно через инструменты.
@@ -180,6 +186,10 @@ autoreply:
 - is_deleted INTEGER DEFAULT 0
 - edited_at INTEGER
 - media_id INTEGER           -- FK на media.id или NULL
+- was_disappearing INTEGER DEFAULT 0  -- было исчезающим/one-time (мод)
+- self_destruct INTEGER DEFAULT 0     -- самоуничтожение по просмотру (мод)
+- is_secret INTEGER DEFAULT 0         -- из секретного E2E чата (мод)
+- ttl INTEGER DEFAULT 0               -- было авто-удаление по таймеру
 - raw_json TEXT              -- сырой объект события (на всякий)
 - UNIQUE(chat_id, tg_message_id, edited_at)  -- версии правок отдельными строками
 
@@ -238,6 +248,20 @@ db.py экспортирует: `init_db(path)`, `get_conn()`, `upsert_chat(...)
   — при `simulate_typing` показать «печатает…», выждать задержку
   (autoreply.min/max_delay_sec), отправить.
 - `async send_draft_now(draft_id)` — берёт черновик из БД и отправляет.
+
+## 6b. Sync-API для мод-клиента (dashboard/app.py или отдельный роутер)
+
+Основной источник данных — мод Telegram на телефоне (PLAN_MOD_ANDROID.md).
+Он шлёт сообщения и файлы на бэкенд. Эндпоинты (FastAPI):
+- `POST /sync/messages` — JSON-пачка сообщений -> insert_message + FTS.
+  Поля включают was_disappearing/self_destruct/is_secret/ttl.
+- `POST /sync/media` — multipart-файл -> сохранить в media на диске ПК,
+  создать строку media, связать с сообщением.
+- `POST /ai/reply` — {chat_id, incoming_text, mode} -> вызвать
+  ai.reply.make_reply -> вернуть текст (для панели черновика на телефоне).
+- `GET /health` — доступность мозга.
+Аутентификация: заголовок с общим секретом (env SYNC_TOKEN), проверять на
+каждом запросе. Слушать только локальную сеть / VPN (не наружу).
 
 ## 7. AI-слой (локальный Ollama + доступ в интернет)
 
