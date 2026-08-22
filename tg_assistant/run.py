@@ -1,18 +1,42 @@
-"""Точка входа Nersiti TG Assistant.
+"""Точка входа бэкенда Nersiti (мозг на ПК).
 
-Порядок (docs/PLAN.md §11):
-  1) load_settings() из .env + config.yaml
-  2) setup_logging(); init_db(); создать папки data/
-  3) build_client() -> авторизация Telethon (интерактивно при первом запуске)
-  4) handlers.register(client, deps)  -> архив + автоответ
-  5) поднять FastAPI (uvicorn) и Telethon в одном asyncio loop (asyncio.gather)
-  6) корректное завершение по Ctrl+C
+Поднимает FastAPI-сервер с sync-API для мод-клиента и API панели.
+Нейросеть (Ollama) подключается автоматически, когда запущена; до этого
+сервер работает (архив, приём с телефона, preset-автоответы).
 
-TODO(исполнитель): реализовать по контрактам модулей.
+Запуск:  python run.py
 """
-# TODO
+from __future__ import annotations
+
+import uvicorn
+
+from nersiti_tg.ai.ollama_client import OllamaClient
+from nersiti_tg.ai.persona import Persona
+from nersiti_tg.config import load_settings
+from nersiti_tg.dashboard.app import create_app
+from nersiti_tg.logging_setup import setup_logging
+from nersiti_tg.storage.db import Database
+
+
+def build():
+    settings = load_settings()
+    settings.ensure_dirs()
+    setup_logging("INFO", settings.log_path)
+    db = Database(settings.db_path)
+    ollama = OllamaClient(base_url=settings.ai.base_url, model=settings.ai.model,
+                          embed_model=settings.ai.embed_model,
+                          temperature=settings.ai.temperature,
+                          max_tokens=settings.ai.max_tokens)
+    persona = Persona(settings.persona_path)
+    app = create_app(settings, db, ollama, persona)
+    return settings, app
+
+
+def main() -> None:
+    settings, app = build()
+    uvicorn.run(app, host=settings.secrets.dashboard_host,
+                port=settings.secrets.dashboard_port)
 
 
 if __name__ == "__main__":
-    # TODO: asyncio.run(main())
-    raise SystemExit("Не реализовано. См. docs/PLAN.md и заполните модули.")
+    main()

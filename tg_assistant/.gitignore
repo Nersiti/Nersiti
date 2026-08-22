@@ -10,3 +10,7 @@ __pycache__/
 *.pyc
 .venv/
 venv/
+
+# сборка APK
+/tg_assistant/android_mod/_apk_build/
+_apk_build/
