@@ -48,10 +48,12 @@ def _text_of(resp) -> str:
 
 
 class ClaudeAgent:
-    def __init__(self, tool_agent, persona, api_key: str,
+    def __init__(self, tool_agent, persona, api_key: str = "",
                  model: str = "claude-opus-5"):
         import anthropic  # ленивый импорт
-        self.client = anthropic.AsyncAnthropic(api_key=api_key)
+        # с ключом — по токенам; без ключа — по OAuth-профилю (подписка, `ant auth login`)
+        self.client = (anthropic.AsyncAnthropic(api_key=api_key) if api_key
+                       else anthropic.AsyncAnthropic())
         self.tools_exec = tool_agent._exec_tool   # переиспользуем исполнение инструментов
         self.persona = persona
         self.model = model

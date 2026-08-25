@@ -617,7 +617,9 @@ def main() -> None:
     tool_agent = Agent(settings, db, videos, ollama, persona, worker=worker)
     assistant = tool_agent
     key = settings.secrets.anthropic_api_key
-    if key and settings.ai.assistant_backend in ("auto", "claude"):
+    backend = settings.ai.assistant_backend
+    # Claude: если есть ключ (auto/claude) ИЛИ явно выбран backend=claude (подписка/OAuth)
+    if (key and backend in ("auto", "claude")) or backend == "claude":
         try:
             from ..ai.claude_agent import ClaudeAgent
             assistant = ClaudeAgent(tool_agent, persona, key, settings.ai.claude_model)
