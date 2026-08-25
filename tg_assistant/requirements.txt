@@ -31,3 +31,6 @@ trafilatura==1.12.2        # извлечение основного текст�
 
 # связка asyncio(Telethon) с Qt в GUI
 qasync==0.27.1
+
+# ИИ-ассистент на Claude (Anthropic) — если задан ANTHROPIC_API_KEY
+anthropic>=0.40

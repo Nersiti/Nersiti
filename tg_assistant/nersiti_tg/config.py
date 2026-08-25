@@ -26,6 +26,9 @@ class AISettings:
     max_tokens: int = 512
     context_messages: int = 20
     use_tools: bool = True
+    # ассистент: "auto" (Claude если есть ключ, иначе Ollama) | "claude" | "ollama"
+    assistant_backend: str = "auto"
+    claude_model: str = "claude-opus-5"   # можно claude-sonnet-5 / claude-haiku-4-5 (дешевле/быстрее)
 
 
 @dataclass
@@ -83,6 +86,7 @@ class Secrets:
     dashboard_host: str = "127.0.0.1"
     dashboard_port: int = 8765
     sync_token: str = "change_me"
+    anthropic_api_key: str = ""   # ключ Claude (ANTHROPIC_API_KEY) — включает ИИ-ассистента Claude
 
 
 @dataclass
@@ -176,6 +180,7 @@ def load_settings(env_path: str = ".env", yaml_path: str = "config.yaml") -> Set
     s.dashboard_host = os.environ.get("DASHBOARD_HOST", s.dashboard_host)
     s.dashboard_port = int(os.environ.get("DASHBOARD_PORT", s.dashboard_port) or 8765)
     s.sync_token = os.environ.get("SYNC_TOKEN", s.sync_token)
+    s.anthropic_api_key = os.environ.get("ANTHROPIC_API_KEY", s.anthropic_api_key)
 
     # переопределение каталога данных из окружения (удобно для тестов)
     if os.environ.get("NERSITI_DATA_DIR"):

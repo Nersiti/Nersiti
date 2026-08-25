@@ -614,9 +614,18 @@ def main() -> None:
     worker.start()
 
     from ..agent import Agent
-    agent = Agent(settings, db, videos, ollama, persona, worker=worker)
+    tool_agent = Agent(settings, db, videos, ollama, persona, worker=worker)
+    assistant = tool_agent
+    key = settings.secrets.anthropic_api_key
+    if key and settings.ai.assistant_backend in ("auto", "claude"):
+        try:
+            from ..ai.claude_agent import ClaudeAgent
+            assistant = ClaudeAgent(tool_agent, persona, key, settings.ai.claude_model)
+        except Exception as e:  # noqa
+            print("Claude недоступен, использую локальную модель:", e)
+            assistant = tool_agent
 
-    win = MainWindow(settings, db, ollama, persona, videos, worker, agent)
+    win = MainWindow(settings, db, ollama, persona, videos, worker, assistant)
     win.show()
     sys.exit(app.exec())
 

@@ -11,7 +11,7 @@ if errorlevel 1 (
 
 echo Installing dependencies. First run may take a few minutes...
 python -m pip install --quiet --upgrade pip
-python -m pip install --quiet PySide6 telethon httpx pyyaml
+python -m pip install --quiet PySide6 telethon httpx pyyaml anthropic
 
 if not exist ".env" (
   echo.

@@ -136,9 +136,11 @@ class Agent:
         except Exception as e:  # noqa
             return f"ошибка инструмента {name}: {e}"
 
+    RU = " ВАЖНО: отвечай ВСЕГДА только на русском языке."
+
     async def chat_simple(self, user_text: str, history=None) -> str:
         """Быстрый ответ без инструментов (один прогон модели). history — прошлые реплики."""
-        messages = [{"role": "system", "content": self.persona.get()}]
+        messages = [{"role": "system", "content": self.persona.get() + self.RU}]
         messages.extend(history or [])
         messages.append({"role": "user", "content": user_text})
         msg = await self.ollama.chat(messages)
@@ -147,7 +149,7 @@ class Agent:
     # ---- основной цикл ----
     async def run(self, user_text: str, history=None, max_iters: int = 4) -> str:
         messages = [
-            {"role": "system", "content": self.persona.get() +
+            {"role": "system", "content": self.persona.get() + self.RU +
              "\nТы можешь вызывать инструменты для действий по просьбе пользователя."},
         ]
         messages.extend(history or [])
