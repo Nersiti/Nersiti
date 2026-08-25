@@ -55,16 +55,22 @@ sed -i "s#BACKEND_URL = \".*\"#BACKEND_URL = \"${BACKEND_URL}\"#" "$NC"
 sed -i "s#SYNC_TOKEN = \".*\"#SYNC_TOKEN = \"${SYNC_TOKEN}\"#" "$NC"
 
 echo "==> 5/5 Сборка APK (gradle)"
+# BUILD_TYPE=debug (по умолчанию) — APK подписан debug-ключом gradle и ставится
+# сразу, keystore не нужен. release — только если настроишь signingConfigs.
+: "${BUILD_TYPE:=debug}"
 cd "$WORK/src"
-if [ -x ./gradlew ]; then
-  ./gradlew assembleRelease || {
-    echo "Сборка упала. Частые причины: не установлен NDK нужной версии,"
-    echo "нет keystore для подписи, отсутствует google-services.json."
-    echo "См. docs/BUILD_APK.md."
+if [ ! -x ./gradlew ]; then echo "gradlew не найден в форке."; exit 1; fi
+
+if [ "$BUILD_TYPE" = "release" ]; then
+  ./gradlew assembleRelease || { echo "release-сборка упала (нужен keystore/NDK). См. docs/BUILD_APK.md."; exit 1; }
+else
+  # afat/standalone — типовой flavor у форков Telegram; если нет, ставим просто assembleDebug
+  ./gradlew assembleAfatDebug || ./gradlew assembleStandaloneDebug || ./gradlew assembleDebug || {
+    echo "debug-сборка упала. Частые причины: не установлен NDK нужной версии."
+    echo "Проверь: sdkmanager 'ndk;27.0.12077973'. Подробности — docs/BUILD_APK.md."
     exit 1
   }
-else
-  echo "gradlew не найден в форке."; exit 1
 fi
 
-echo "Готово. Ищи APK в TMessagesProj/build/outputs/apk/"
+APK=$(find "$WORK/src" -path '*/outputs/apk/*.apk' | head -1)
+echo "Готово. APK: ${APK:-'ищи в TMessagesProj/build/outputs/apk/'}"
