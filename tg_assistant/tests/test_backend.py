@@ -160,6 +160,32 @@ def test_collector_extract():
     assert rv["was_disappearing"] == 1 and rv["self_destruct"] == 1
 
 
+def test_agent_tools(tmp_path):
+    import asyncio
+    from nersiti_tg.agent import Agent
+    from nersiti_tg.ai.ollama_client import OllamaClient
+    from nersiti_tg.ai.persona import Persona
+    from nersiti_tg.media.video_manager import VideoManager
+    from nersiti_tg.storage.models import Chat, Message
+    settings, db, _c = _make()
+    db.upsert_chat(Chat(chat_id=5, title="Дима"))
+    db.insert_message(Message(id=None, tg_message_id=1, chat_id=5,
+                              sender_name="Дима", text="привет мир", date=1))
+    ag = Agent(settings, db, VideoManager(db, settings),
+               OllamaClient(), Persona(settings.persona_path))
+    # инструмент поиска реально ищет в архиве
+    r = asyncio.run(ag._exec_tool("search_archive", {"query": "привет"}))
+    assert "привет" in r
+    # статистика видео возвращается
+    r2 = asyncio.run(ag._exec_tool("video_stats", {}))
+    assert "dropped_videos" in r2
+    # автоответ ставится по имени чата
+    r3 = asyncio.run(ag._exec_tool("set_autoreply",
+                                   {"chat": "дима", "mode": "draft"}))
+    assert "автоответ" in r3
+    assert db.get_chat_settings(5).mode == "draft"
+
+
 def test_channel_cleanup_parse():
     from nersiti_tg.telegram.channels import parse_cleanup_decision
     channels = [{"id": 10, "title": "Крипта"}, {"id": 20, "title": "Новости"},

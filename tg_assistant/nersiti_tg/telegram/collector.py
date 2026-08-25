@@ -64,10 +64,12 @@ def message_to_record(msg: Any, chat_id: int, sender_name: str = "",
 
 
 class Collector:
-    def __init__(self, db, videos, settings):
+    def __init__(self, db, videos, settings, ollama=None, persona=None):
         self.db = db
         self.videos = videos
         self.settings = settings
+        self.ollama = ollama       # если задан — работает автоответ
+        self.persona = persona
 
     def register(self, client) -> None:
         from telethon import events  # ленивый импорт
@@ -96,6 +98,24 @@ class Collector:
             media_id = await self._download(event, msg, cid, kind)
         row = Message(id=None, media_id=media_id, **rec)
         self.db.insert_message(row)
+
+        # автоответ на входящие (если подключена модель и настроен режим)
+        if self.ollama is not None and not rec["is_outgoing"] and rec["text"]:
+            await self._autoreply(event, cid, rec["text"])
+
+    async def _autoreply(self, event, chat_id: int, text: str) -> None:
+        from ..autoreply import engine  # ленивый импорт
+        try:
+            decision = await engine.decide(
+                self.db, self.ollama, self.persona, chat_id, text,
+                self.settings.autoreply, self.settings.ai.context_messages)
+        except Exception:
+            return
+        if decision.get("action") == "send" and decision.get("text"):
+            try:
+                await event.client.send_message(chat_id, decision["text"])
+            except Exception:
+                pass
 
     async def _download(self, event, msg, chat_id: int, kind: str) -> Optional[int]:
         sub = self.settings.media_dir / str(chat_id) / datetime.now().strftime("%Y-%m")
