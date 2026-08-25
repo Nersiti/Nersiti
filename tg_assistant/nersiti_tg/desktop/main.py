@@ -35,23 +35,57 @@ from .worker import TgWorker
 
 
 DARK_QSS = """
-* { color:#e8e8ea; font-family:'Segoe UI',sans-serif; font-size:13px; }
-QWidget { background:#0a0a0b; }
-QMainWindow, QDialog { background:#060607; }
-QLineEdit, QTextEdit, QListWidget, QScrollArea {
-  background:#111113; border:1px solid #242428; border-radius:8px; padding:8px; }
-QLineEdit:focus, QTextEdit:focus { border:1px solid #3a3a42; }
-QPushButton { background:#161619; border:1px solid #2a2a30; border-radius:8px; padding:8px 14px; }
-QPushButton:hover { background:#1f1f24; }
-QPushButton#primary { background:#1c1c22; border:1px solid #3a3a44; font-weight:600; }
-QPushButton#danger { background:#241716; border:1px solid #4a2a25; color:#e0776b; }
-QTabWidget::pane { border:1px solid #1c1c20; }
-QTabBar::tab { background:#0d0d0e; padding:8px 16px; border:1px solid #1c1c20; border-bottom:none; }
-QTabBar::tab:selected { background:#161619; }
-QLabel#title { font-size:20px; font-weight:700; }
-QLabel#muted { color:#7a7a82; }
-QCheckBox { spacing:8px; }
-QDockWidget::title { background:#0d0d0e; padding:6px; }
+* { color:#e8eaed; font-family:'Segoe UI',sans-serif; font-size:13px; }
+QWidget { background:#0b0c0e; }
+QMainWindow, QDialog { background:#08090b; }
+
+QTabWidget::pane { border:none; background:#0b0c0e; top:-1px; }
+QTabBar { background:transparent; qproperty-drawBase:0; }
+QTabBar::tab { background:transparent; color:#868c96; padding:11px 20px; margin-right:2px;
+  border:none; border-bottom:2px solid transparent; font-weight:600; }
+QTabBar::tab:selected { color:#f0f2f5; border-bottom:2px solid #5b8dd6; }
+QTabBar::tab:hover { color:#c5c9d1; }
+
+QListWidget { background:#0e1013; border:1px solid #1b1e23; border-radius:12px; padding:6px; outline:0; }
+QListWidget::item { padding:12px 14px; border-radius:9px; margin:1px 2px; color:#d6dae1; }
+QListWidget::item:hover { background:#15181d; }
+QListWidget::item:selected { background:#1a2634; color:#eaf1fb; }
+
+QLineEdit, QTextEdit { background:#0e1013; border:1px solid #1f2329; border-radius:10px;
+  padding:10px 12px; color:#e8eaed; selection-background-color:#2f4a63; }
+QLineEdit:focus, QTextEdit:focus { border:1px solid #3a5a7a; }
+QLineEdit::placeholder { color:#5c626c; }
+
+QScrollArea { background:#0b0c0e; border:none; }
+
+QPushButton { background:#16181c; border:1px solid #262a30; border-radius:9px;
+  padding:9px 15px; color:#d6dae1; }
+QPushButton:hover { background:#1d2025; border-color:#31363d; }
+QPushButton#primary { background:#213445; border:1px solid #305777; color:#e0ecf9; font-weight:600; }
+QPushButton#primary:hover { background:#274257; }
+QPushButton#danger { background:#2a1918; border:1px solid #5a2f2a; color:#e88b80; }
+QPushButton#danger:hover { background:#331d1b; }
+
+QToolBar { background:#090a0c; border-bottom:1px solid #191c21; spacing:10px; padding:8px 12px; }
+QToolBar QLabel { color:#7c828c; }
+
+QDockWidget { border:none; titlebar-close-icon:none; }
+QDockWidget::title { background:#0d0f12; padding:10px 14px; color:#868c96; border-bottom:1px solid #191c21; }
+
+QLabel#title { font-size:22px; font-weight:700; color:#f2f4f7; }
+QLabel#h { font-size:16px; font-weight:700; color:#eef1f5; }
+QLabel#muted { color:#7c828c; }
+QCheckBox { spacing:9px; padding:6px 2px; color:#d6dae1; }
+QCheckBox::indicator { width:16px; height:16px; border:1px solid #3a3f47; border-radius:4px; background:#0e1013; }
+QCheckBox::indicator:checked { background:#5b8dd6; border-color:#5b8dd6; }
+
+QScrollBar:vertical { background:transparent; width:11px; margin:3px; }
+QScrollBar::handle:vertical { background:#2a2e35; border-radius:5px; min-height:32px; }
+QScrollBar::handle:vertical:hover { background:#3a3f47; }
+QScrollBar:horizontal { background:transparent; height:11px; margin:3px; }
+QScrollBar::handle:horizontal { background:#2a2e35; border-radius:5px; min-width:32px; }
+QScrollBar::add-line, QScrollBar::sub-line { width:0; height:0; }
+QScrollBar::add-page, QScrollBar::sub-page { background:transparent; }
 """
 
 
@@ -84,49 +118,86 @@ class Bus(QObject):
     channels = Signal(list)
 
 
+# слова-триггеры действий: только тогда запускаем агента с инструментами
+ACTION_WORDS = ("отправ", "видео", "автоответ", "ответь", "почист", "чист",
+                "канал", "дедуп", "дубл", "найди", "поиск", "ищи", "удали",
+                "статистик", "счётчик", "счетчик")
+
+
+def _needs_tools(text: str) -> bool:
+    t = text.lower()
+    return any(w in t for w in ACTION_WORDS)
+
+
 class AiChat(QDockWidget):
     def __init__(self, agent):
         super().__init__("ИИ-ассистент")
         self.agent = agent
         self.bus = Bus(); self.bus.text.connect(self._show)
-        body = QWidget(); lay = QVBoxLayout(body)
+        body = QWidget(); body.setStyleSheet("background:#0b0c0e;")
+        lay = QVBoxLayout(body); lay.setContentsMargins(12, 12, 12, 12); lay.setSpacing(10)
         self.log = QTextEdit(); self.log.setReadOnly(True)
-        row = QHBoxLayout()
+        self.log.setStyleSheet("border:1px solid #1b1e23; background:#0e1013;")
+        self.status = QLabel(""); self.status.setObjectName("muted")
+        row = QHBoxLayout(); row.setSpacing(8)
         self.inp = QLineEdit()
-        self.inp.setPlaceholderText("Напиши, что сделать… (отправь видео, включи автоответ, найди…)")
+        self.inp.setPlaceholderText("Напиши, что сделать: отправь видео, включи автоответ, найди…")
         self.inp.returnPressed.connect(self._send)
-        snd = QPushButton("→"); snd.clicked.connect(self._send)
+        snd = QPushButton("→"); snd.setObjectName("primary"); snd.setFixedWidth(46)
+        snd.clicked.connect(self._send)
         row.addWidget(self.inp); row.addWidget(snd)
-        lay.addWidget(self.log); lay.addLayout(row)
+        lay.addWidget(self.log, 1); lay.addWidget(self.status); lay.addLayout(row)
         self.setWidget(body)
+        self._hello()
+
+    def _hello(self):
+        self.log.append(
+            "<div style='color:#7c828c;padding:6px 2px'>Привет! Я ассистент Nersiti. "
+            "Могу: найти в переписке, включить автоответ, отправить видео, "
+            "предложить чистку каналов. Просто напиши задачу.</div>")
 
     def _send(self):
         q = self.inp.text().strip()
         if not q:
             return
-        self.log.append(f"<b>Вы:</b> {q}"); self.inp.clear()
+        self.log.append(
+            f"<div style='margin:8px 0'><span style='color:#5b8dd6;font-weight:600'>Вы</span>"
+            f"<div style='background:#182634;border-radius:10px;padding:8px 11px;margin-top:3px'>{q}</div></div>")
+        self.inp.clear()
+        self.status.setText("Ассистент печатает…")
         threading.Thread(target=self._ask, args=(q,), daemon=True).start()
 
     def _ask(self, q: str):
         try:
-            answer = asyncio.run(self.agent.run(q))
+            if _needs_tools(q):
+                answer = asyncio.run(self.agent.run(q))        # действие -> инструменты
+            else:
+                answer = asyncio.run(self.agent.chat_simple(q))  # разговор -> 1 быстрый прогон
             self.bus.text.emit(answer or "готово")
         except Exception as e:  # noqa
-            self.bus.text.emit(f"[ИИ недоступен: {e}. Запущен ли Ollama?]")
+            self.bus.text.emit(
+                "⚠ Не удалось ответить. Проверь, что запущена Ollama и скачана "
+                f"модель (ollama pull qwen2.5:7b-instruct).\nПодробно: {e}")
 
     def _show(self, text: str):
-        self.log.append(f"<b>Ассистент:</b> {text}")
+        self.status.setText("")
+        safe = text.replace("<", "&lt;").replace("\n", "<br>")
+        self.log.append(
+            f"<div style='margin:8px 0'><span style='color:#7bb67f;font-weight:600'>Ассистент</span>"
+            f"<div style='background:#141719;border:1px solid #1f2329;border-radius:10px;"
+            f"padding:8px 11px;margin-top:3px'>{safe}</div></div>")
 
 
 class VideoTab(QWidget):
     def __init__(self, videos: VideoManager):
         super().__init__()
         self.videos = videos
-        lay = QVBoxLayout(self)
+        lay = QVBoxLayout(self); lay.setContentsMargins(18, 16, 18, 16); lay.setSpacing(11)
+        head = QLabel("Видео — дубли и подсчёт"); head.setObjectName("h")
         self.stats = QLabel(); self.stats.setObjectName("muted")
         drop = QPushButton("Скинуть видео (файлы)"); drop.setObjectName("primary"); drop.clicked.connect(self._drop)
         dedup = QPushButton("Найти и удалить дубли в папке…"); dedup.clicked.connect(self._dedup)
-        for w in (QLabel("Видео: дедупликация и подсчёт"), drop, dedup, self.stats):
+        for w in (head, self.stats, drop, dedup):
             lay.addWidget(w)
         lay.addStretch(1); self._refresh()
 
@@ -160,8 +231,9 @@ class ChannelsTab(QWidget):
         self.worker, self.ollama = worker, ollama
         self.bus = Bus(); self.bus.channels.connect(self._show_proposal)
         self.proposal = []
-        lay = QVBoxLayout(self)
-        lay.addWidget(QLabel("Чистка каналов по промту"))
+        lay = QVBoxLayout(self); lay.setContentsMargins(18, 16, 18, 16); lay.setSpacing(10)
+        _hh = QLabel("Чистка каналов по промту"); _hh.setObjectName("h")
+        lay.addWidget(_hh)
         row = QHBoxLayout()
         self.prompt = QLineEdit()
         self.prompt.setPlaceholderText("напр.: выйти из крипто-каналов, что не открывал месяц")
@@ -232,14 +304,24 @@ class MainWindow(QMainWindow):
         tabs = QTabWidget()
 
         self.chats = QListWidget()
-        tabs.addTab(self.chats, "Чаты и каналы")
+        chats_wrap = QWidget(); cw = QVBoxLayout(chats_wrap)
+        cw.setContentsMargins(18, 16, 18, 16); cw.setSpacing(10)
+        h1 = QLabel("Чаты и каналы"); h1.setObjectName("h")
+        self.chats_count = QLabel(""); self.chats_count.setObjectName("muted")
+        cw.addWidget(h1); cw.addWidget(self.chats_count); cw.addWidget(self.chats, 1)
+        tabs.addTab(chats_wrap, "Чаты и каналы")
         tabs.addTab(ChannelsTab(worker, ollama), "Чистка каналов")
         self.video_tab = VideoTab(videos)
         tabs.addTab(self.video_tab, "Видео")
 
         sett = QWidget(); sl = QVBoxLayout(sett)
-        sl.addWidget(QLabel(f"Архив: {settings.data_path}"))
-        sl.addWidget(QLabel(f"Модель ИИ: {settings.ai.model} (Ollama)"))
+        sl.setContentsMargins(18, 16, 18, 16); sl.setSpacing(9)
+        _sh = QLabel("Настройки"); _sh.setObjectName("h"); sl.addWidget(_sh)
+        m1 = QLabel(f"Папка архива:  {settings.data_path}"); m1.setObjectName("muted")
+        m2 = QLabel(f"Модель ИИ:  {settings.ai.model} (Ollama)"); m2.setObjectName("muted")
+        m3 = QLabel("Пароль входа задаётся в config (по умолчанию Logingood123337)."); m3.setObjectName("muted")
+        for w in (m1, m2, m3):
+            sl.addWidget(w)
         sl.addStretch(1)
         tabs.addTab(sett, "Настройки")
         self.setCentralWidget(tabs)
@@ -268,8 +350,11 @@ class MainWindow(QMainWindow):
             self.chats.clear()
             for c in self.db.list_chats():
                 self.chats.addItem(QListWidgetItem(c["title"] or str(c["chat_id"])))
-            if self.chats.count() == 0:
+            n = self.chats.count()
+            if n == 0:
                 self.chats.addItem("Пока пусто — идёт первичная загрузка…")
+            else:
+                self.chats_count.setText(f"{n} диалогов в архиве")
             if cur >= 0:
                 self.chats.setCurrentRow(min(cur, self.chats.count() - 1))
         except Exception:

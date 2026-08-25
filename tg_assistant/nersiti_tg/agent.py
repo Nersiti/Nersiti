@@ -119,6 +119,13 @@ class Agent:
         except Exception as e:  # noqa
             return f"ошибка инструмента {name}: {e}"
 
+    async def chat_simple(self, user_text: str) -> str:
+        """Быстрый ответ без инструментов (один прогон модели)."""
+        msg = await self.ollama.chat([
+            {"role": "system", "content": self.persona.get()},
+            {"role": "user", "content": user_text}])
+        return (msg or {}).get("content", "") or ""
+
     # ---- основной цикл ----
     async def run(self, user_text: str, max_iters: int = 4) -> str:
         messages = [
