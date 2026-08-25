@@ -56,6 +56,11 @@ scripts\setup_model.ps1        # тянет qwen2.5:7b-instruct и bge-m3
 DONE: ассистент отвечает.
 
 ## ФАЗА 4. Подключить Telegram (Telethon) — ГЛАВНОЕ, что осталось
+УЖЕ ГОТОВО и работает безголово: `python run_telegram.py` (логин + живая
+архивация всех чатов/каналов/медиа/видео с дедупом; `--backfill N` тянет
+историю; `--clean "промт"` чистит каналы по промту с подтверждением).
+Модули `telegram/client.py`, `telegram/collector.py`, `telegram/channels.py`
+готовы и покрыты тестами. Твоя задача — ВСТРОИТЬ это в GUI:
 В `nersiti_tg/desktop/main.py` есть блок `# TODO(Telegram)`. Реализуй:
 1. Авторизация Telethon по `TG_API_ID/HASH` (первый вход — код/2FA в окне),
    сессия в файле архива.

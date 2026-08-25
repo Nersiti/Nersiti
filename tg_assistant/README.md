@@ -16,14 +16,27 @@
 >   APK нужны твои api_id/api_hash. См. docs/PLAN_MOD_ANDROID.md и
 >   docs/BUILD_APK.md.
 
-## Быстрый старт бэкенда
+## Быстрый старт
 ```bash
 cd tg_assistant
-python -m venv .venv && source .venv/bin/activate
+python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-cp .env.example .env            # заполнить SYNC_TOKEN (и TG_* если нужен userbot)
-python run.py                   # сервер на 127.0.0.1:8765
-pytest -q                       # прогнать тесты
+cp .env.example .env            # вписать TG_API_ID, TG_API_HASH (my.telegram.org)
+pytest -q                       # тесты (9 passed)
+```
+
+### Подключить Telegram (архивация всего в папку)
+```bash
+python run_telegram.py                 # логин (код из Telegram) + живая архивация
+python run_telegram.py --backfill 300  # + подтянуть историю
+python run_telegram.py --clean "выйти из крипто-каналов, что не открывал месяц"
+```
+Всё пишется в папку архива (создаётся сама): `~/NersitiArchive` (Windows:
+`C:\Users\<имя>\NersitiArchive`).
+
+### Десктоп-приложение (строгий чёрный стиль, пароль)
+```bash
+python -m nersiti_tg.desktop.main       # пароль по умолчанию: Logingood123337
 ```
 
 **Актуальная версия — десктоп-приложение под Windows** (строгий чёрный стиль,

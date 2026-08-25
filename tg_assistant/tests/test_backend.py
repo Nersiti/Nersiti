@@ -139,6 +139,27 @@ def test_video_endpoints(tmp_path):
     assert c.get("/video/stats").json()["dropped_videos"] == 1
 
 
+def test_collector_extract():
+    from datetime import datetime
+    from types import SimpleNamespace
+    from nersiti_tg.telegram.collector import (message_to_record, media_kind,
+                                               is_video)
+    # обычное текстовое исходящее сообщение
+    msg = SimpleNamespace(id=42, message="привет", date=datetime(2025, 1, 1),
+                          out=True, sender_id=7, reply_to_msg_id=0,
+                          ttl_seconds=None)
+    rec = message_to_record(msg, chat_id=100)
+    assert rec["tg_message_id"] == 42 and rec["is_outgoing"] == 1
+    assert rec["chat_id"] == 100 and rec["date"] > 0
+    # исчезающее видео
+    vid = SimpleNamespace(id=43, message="", date=1700000000, out=False,
+                          sender_id=8, reply_to_msg_id=0, ttl_seconds=5,
+                          video=object())
+    assert is_video(vid) and media_kind(vid) == "video"
+    rv = message_to_record(vid, chat_id=100)
+    assert rv["was_disappearing"] == 1 and rv["self_destruct"] == 1
+
+
 def test_channel_cleanup_parse():
     from nersiti_tg.telegram.channels import parse_cleanup_decision
     channels = [{"id": 10, "title": "Крипта"}, {"id": 20, "title": "Новости"},
