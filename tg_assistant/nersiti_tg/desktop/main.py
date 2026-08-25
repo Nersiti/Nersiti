@@ -133,6 +133,7 @@ class AiChat(QDockWidget):
     def __init__(self, agent):
         super().__init__("ИИ-ассистент")
         self.agent = agent
+        self.history = []   # память разговора: [{role, content}, ...]
         self.bus = Bus(); self.bus.text.connect(self._show)
         body = QWidget(); body.setStyleSheet("background:#0b0c0e;")
         lay = QVBoxLayout(body); lay.setContentsMargins(12, 12, 12, 12); lay.setSpacing(10)
@@ -169,11 +170,17 @@ class AiChat(QDockWidget):
 
     def _ask(self, q: str):
         try:
+            hist = list(self.history)
             if _needs_tools(q):
-                answer = asyncio.run(self.agent.run(q))        # действие -> инструменты
+                answer = asyncio.run(self.agent.run(q, history=hist))
             else:
-                answer = asyncio.run(self.agent.chat_simple(q))  # разговор -> 1 быстрый прогон
-            self.bus.text.emit(answer or "готово")
+                answer = asyncio.run(self.agent.chat_simple(q, history=hist))
+            answer = answer or "готово"
+            # запомнить обмен (ограничим память последними 16 репликами)
+            self.history.append({"role": "user", "content": q})
+            self.history.append({"role": "assistant", "content": answer})
+            self.history = self.history[-16:]
+            self.bus.text.emit(answer)
         except Exception as e:  # noqa
             self.bus.text.emit(
                 "⚠ Не удалось ответить. Проверь, что запущена Ollama и скачана "

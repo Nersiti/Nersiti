@@ -119,20 +119,22 @@ class Agent:
         except Exception as e:  # noqa
             return f"ошибка инструмента {name}: {e}"
 
-    async def chat_simple(self, user_text: str) -> str:
-        """Быстрый ответ без инструментов (один прогон модели)."""
-        msg = await self.ollama.chat([
-            {"role": "system", "content": self.persona.get()},
-            {"role": "user", "content": user_text}])
+    async def chat_simple(self, user_text: str, history=None) -> str:
+        """Быстрый ответ без инструментов (один прогон модели). history — прошлые реплики."""
+        messages = [{"role": "system", "content": self.persona.get()}]
+        messages.extend(history or [])
+        messages.append({"role": "user", "content": user_text})
+        msg = await self.ollama.chat(messages)
         return (msg or {}).get("content", "") or ""
 
     # ---- основной цикл ----
-    async def run(self, user_text: str, max_iters: int = 4) -> str:
+    async def run(self, user_text: str, history=None, max_iters: int = 4) -> str:
         messages = [
             {"role": "system", "content": self.persona.get() +
              "\nТы можешь вызывать инструменты для действий по просьбе пользователя."},
-            {"role": "user", "content": user_text},
         ]
+        messages.extend(history or [])
+        messages.append({"role": "user", "content": user_text})
         for _ in range(max_iters):
             msg = await self.ollama.chat(messages, tools=TOOLS)
             calls = msg.get("tool_calls") or []
