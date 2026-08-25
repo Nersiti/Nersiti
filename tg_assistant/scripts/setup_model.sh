@@ -10,7 +10,7 @@ if ! command -v ollama >/dev/null 2>&1; then
 fi
 
 echo "2) Скачиваю разговорную модель с поддержкой инструментов..."
-ollama pull qwen2.5:7b-instruct
+ollama pull qwen3:8b
 
 echo "3) Скачиваю модель эмбеддингов (для поиска по архиву)..."
 ollama pull bge-m3
@@ -18,5 +18,5 @@ ollama pull bge-m3
 # Вариант "без ограничений" (по желанию): раскомментируй и укажи в config.yaml.
 # ollama pull dolphin-mistral:7b
 
-echo "Готово. В config.yaml ai.model = qwen2.5:7b-instruct"
+echo "Готово. В config.yaml ai.model = qwen3:8b"
 ollama list

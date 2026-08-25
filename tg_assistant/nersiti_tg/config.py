@@ -20,7 +20,7 @@ except Exception:  # pragma: no cover
 class AISettings:
     provider: str = "ollama"
     base_url: str = "http://127.0.0.1:11434"
-    model: str = "qwen2.5:7b-instruct"
+    model: str = "qwen3:8b"          # умная локальная модель (инструменты, русский), грузит GPU
     embed_model: str = "bge-m3"
     temperature: float = 0.7
     max_tokens: int = 512

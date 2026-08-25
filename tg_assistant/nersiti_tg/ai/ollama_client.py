@@ -5,12 +5,20 @@ OllamaUnavailable — вызывающий код (ai.reply) это обраба
 """
 from __future__ import annotations
 
+import re
 from typing import Any, Optional
 
 try:
     import httpx
 except Exception:  # pragma: no cover
     httpx = None
+
+_THINK = re.compile(r"<think>.*?</think>", re.DOTALL | re.IGNORECASE)
+
+
+def _strip_think(text: str) -> str:
+    """Убрать блоки размышлений <think>…</think> (у моделей типа Qwen3)."""
+    return _THINK.sub("", text or "").strip()
 
 
 class OllamaUnavailable(RuntimeError):
@@ -51,7 +59,10 @@ class OllamaClient:
         if tools:
             payload["tools"] = tools
         data = await self._post("/api/chat", payload)
-        return data.get("message", {})
+        msg = data.get("message", {}) or {}
+        if isinstance(msg.get("content"), str):
+            msg["content"] = _strip_think(msg["content"])
+        return msg
 
     async def generate(self, prompt: str, system: Optional[str] = None) -> str:
         payload: dict[str, Any] = {"model": self.model, "prompt": prompt,
@@ -59,7 +70,7 @@ class OllamaClient:
         if system:
             payload["system"] = system
         data = await self._post("/api/generate", payload)
-        return data.get("response", "")
+        return _strip_think(data.get("response", ""))
 
     async def embed(self, text: str) -> list[float]:
         data = await self._post("/api/embeddings",

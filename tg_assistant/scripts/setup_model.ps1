@@ -10,7 +10,7 @@ if (-not (Get-Command ollama -ErrorAction SilentlyContinue)) {
 }
 
 Write-Host "2) Скачиваю разговорную модель с поддержкой инструментов..." -ForegroundColor Cyan
-ollama pull qwen2.5:7b-instruct
+ollama pull qwen3:8b
 
 Write-Host "3) Скачиваю модель эмбеддингов (для поиска по архиву)..." -ForegroundColor Cyan
 ollama pull bge-m3
@@ -20,5 +20,5 @@ ollama pull bge-m3
 # если нужна uncensored-модель. Инструменты у dolphin работают хуже, русский слабее.
 # ollama pull dolphin-mistral:7b
 
-Write-Host "Готово. В config.yaml ai.model = qwen2.5:7b-instruct" -ForegroundColor Green
+Write-Host "Готово. В config.yaml ai.model = qwen3:8b" -ForegroundColor Green
 Write-Host "Проверка: " -NoNewline; ollama list
