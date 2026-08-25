@@ -90,6 +90,21 @@ class TgWorker:
             })
         return out
 
+    async def get_history(self, chat_id: int, limit: int = 50) -> list:
+        out = []
+        async for m in self.client.iter_messages(chat_id, limit=limit):
+            text = getattr(m, "message", "") or ""
+            if not text and getattr(m, "media", None):
+                text = "[медиа]"
+            out.append({"out": bool(getattr(m, "out", False)), "text": text,
+                        "date": int(m.date.timestamp()) if getattr(m, "date", None) else 0})
+        out.reverse()
+        return out
+
+    async def send_message(self, chat_id: int, text: str) -> bool:
+        await self.client.send_message(chat_id, text)
+        return True
+
     def submit(self, coro) -> Future:
         """Выполнить корутину в loop воркера. Вернуть concurrent.futures.Future."""
         if self.loop is None:

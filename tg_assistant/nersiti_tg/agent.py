@@ -42,6 +42,11 @@ TOOLS = [
             "submode": {"type": "string"}, "preset_text": {"type": "string"}},
             "required": ["chat", "mode"]}}},
     {"type": "function", "function": {
+        "name": "send_message", "description": "Отправить текстовое сообщение в чат (по имени или id)",
+        "parameters": {"type": "object", "properties": {
+            "chat": {"type": "string"}, "text": {"type": "string"}},
+            "required": ["chat", "text"]}}},
+    {"type": "function", "function": {
         "name": "send_video", "description": "Отправить видео-файл в чат",
         "parameters": {"type": "object", "properties": {
             "chat": {"type": "string"}, "path": {"type": "string"}},
@@ -66,10 +71,15 @@ class Agent:
 
     # ---- вспомогательное ----
     def _resolve_chat_id(self, name: str) -> Optional[int]:
-        name = (name or "").strip().lower()
+        name = (name or "").strip()
+        # прямой id (в т.ч. из «id=NNN»)
+        raw = name.lower().replace("id=", "").strip()
+        if raw.lstrip("-").isdigit():
+            return int(raw)
+        low = name.lower()
         for c in self.db.list_chats():
             title = (c.get("title") or "").lower()
-            if name and (name in title or name == str(c["chat_id"])):
+            if low and low in title:
                 return int(c["chat_id"])
         return None
 
@@ -101,6 +111,13 @@ class Agent:
                     auto_submode=args.get("submode", "generate"),
                     preset_text=args.get("preset_text", ""), enabled=1))
                 return f"автоответ для '{args.get('chat')}' -> {args.get('mode')}"
+            if name == "send_message":
+                cid = self._resolve_chat_id(args.get("chat", ""))
+                if cid is None:
+                    return f"чат '{args.get('chat')}' не найден"
+                await self._via_worker(
+                    self.worker.client.send_message(cid, args.get("text", "")))
+                return f"сообщение отправлено в '{args.get('chat')}'"
             if name == "send_video":
                 cid = self._resolve_chat_id(args.get("chat", ""))
                 if cid is None:

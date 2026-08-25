@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
     QApplication, QDialog, QLineEdit, QVBoxLayout, QHBoxLayout, QLabel,
     QPushButton, QMainWindow, QWidget, QTabWidget, QListWidget, QListWidgetItem,
     QTextEdit, QFileDialog, QDockWidget, QMessageBox, QCheckBox, QScrollArea,
+    QMenu, QSizePolicy,
 )
 
 from ..auth import check_password
@@ -118,6 +119,8 @@ class Bus(QObject):
     text = Signal(str)
     channels = Signal(list)
     dialogs = Signal(list)
+    html = Signal(str)
+    append = Signal(str)
 
 
 AVATAR_COLORS = ["#5b8dd6", "#c96a5e", "#7bb67f", "#b98bd0", "#d0a24a",
@@ -134,43 +137,102 @@ def _initials(name: str) -> str:
 
 
 class ChatRow(QWidget):
-    """Строка чата как в Telegram: аватар-инициалы, имя, превью, время, непрочитанные."""
-    def __init__(self, d: dict):
+    """Строка чата как в Telegram: аватар-инициалы, имя, превью, непрочитанные, «⋯»."""
+    def __init__(self, d: dict, menu_cb):
         super().__init__()
-        lay = QHBoxLayout(self); lay.setContentsMargins(6, 6, 6, 6); lay.setSpacing(11)
-        av = QLabel(_initials(d["name"])); av.setFixedSize(42, 42)
-        av.setAlignment(Qt.AlignCenter)
-        col = AVATAR_COLORS[d["id"] % len(AVATAR_COLORS)]
-        if d["type"] == "saved":
-            col = "#3a6ea5"
-        av.setStyleSheet(
-            f"background:{col};border-radius:21px;color:#fff;font-weight:700;font-size:15px;")
+        self.setFixedHeight(60)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        lay = QHBoxLayout(self); lay.setContentsMargins(8, 6, 8, 6); lay.setSpacing(11)
+        av = QLabel(_initials(d["name"])); av.setFixedSize(44, 44); av.setAlignment(Qt.AlignCenter)
+        col = "#3a6ea5" if d["type"] == "saved" else AVATAR_COLORS[d["id"] % len(AVATAR_COLORS)]
+        av.setStyleSheet(f"background:{col};border-radius:22px;color:#fff;font-weight:700;font-size:15px;")
         lay.addWidget(av)
-        mid = QVBoxLayout(); mid.setSpacing(3)
+        mid = QVBoxLayout(); mid.setSpacing(2); mid.setContentsMargins(0, 0, 0, 0)
         name = QLabel(d["name"]); name.setStyleSheet("font-weight:600;font-size:14px;color:#eef1f5;")
+        name.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
         prev = QLabel(d.get("preview") or " "); prev.setStyleSheet("color:#818892;font-size:12px;")
-        prev.setMaximumWidth(360)
+        prev.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
         mid.addWidget(name); mid.addWidget(prev)
         lay.addLayout(mid, 1)
-        right = QVBoxLayout(); right.setSpacing(4); right.setAlignment(Qt.AlignRight)
         if d.get("unread"):
             badge = QLabel(str(d["unread"])); badge.setAlignment(Qt.AlignCenter)
-            badge.setStyleSheet(
-                "background:#5b8dd6;color:#fff;border-radius:9px;padding:1px 7px;font-size:11px;font-weight:700;")
-            right.addWidget(badge, 0, Qt.AlignRight)
-        lay.addLayout(right)
+            badge.setStyleSheet("background:#5b8dd6;color:#fff;border-radius:9px;"
+                                "padding:1px 7px;font-size:11px;font-weight:700;")
+            lay.addWidget(badge)
+        dots = QPushButton("⋯"); dots.setFixedSize(30, 30)
+        dots.clicked.connect(lambda: menu_cb(d, dots))
+        lay.addWidget(dots)
+
+
+class ConversationDialog(QDialog):
+    """Окно переписки: история + отправка сообщений."""
+    def __init__(self, d, worker):
+        super().__init__()
+        self.d, self.worker = d, worker
+        self.setWindowTitle(d["name"]); self.resize(560, 640)
+        self.bus = Bus()
+        self.bus.html.connect(self._set_html); self.bus.append.connect(self._append)
+        lay = QVBoxLayout(self); lay.setContentsMargins(14, 14, 14, 14); lay.setSpacing(10)
+        hd = QLabel(d["name"]); hd.setObjectName("h"); lay.addWidget(hd)
+        self.view = QTextEdit(); self.view.setReadOnly(True); lay.addWidget(self.view, 1)
+        row = QHBoxLayout(); row.setSpacing(8)
+        self.inp = QLineEdit(); self.inp.setPlaceholderText("Сообщение…")
+        self.inp.returnPressed.connect(self._send)
+        snd = QPushButton("Отправить"); snd.setObjectName("primary"); snd.clicked.connect(self._send)
+        row.addWidget(self.inp); row.addWidget(snd); lay.addLayout(row)
+        self.view.setHtml("<div style='color:#818892'>Загружаю переписку…</div>")
+        threading.Thread(target=self._load, daemon=True).start()
+
+    def _bubble(self, m):
+        align = "right" if m["out"] else "left"
+        bg = "#182634" if m["out"] else "#141719"
+        text = (m["text"] or "").replace("<", "&lt;").replace("\n", "<br>")
+        return (f"<div style='text-align:{align};margin:5px 0'><span style='background:{bg};"
+                f"padding:7px 11px;border-radius:9px;display:inline-block;max-width:75%'>{text}</span></div>")
+
+    def _load(self):
+        try:
+            msgs = self.worker.submit(self.worker.get_history(self.d["id"], 60)).result(timeout=40)
+            self.bus.html.emit("".join(self._bubble(m) for m in msgs) or
+                               "<div style='color:#818892'>Пусто</div>")
+        except Exception as e:  # noqa
+            self.bus.html.emit(f"<div style='color:#c96a5e'>Не удалось загрузить: {e}</div>")
+
+    def _set_html(self, html):
+        self.view.setHtml(html)
+        self.view.verticalScrollBar().setValue(self.view.verticalScrollBar().maximum())
+
+    def _append(self, html):
+        self.view.append(html)
+
+    def _send(self):
+        t = self.inp.text().strip()
+        if not t:
+            return
+        self.inp.clear()
+        self.view.append(self._bubble({"out": True, "text": t}))
+        threading.Thread(target=self._send_bg, args=(t,), daemon=True).start()
+
+    def _send_bg(self, t):
+        try:
+            self.worker.submit(self.worker.send_message(self.d["id"], t)).result(timeout=40)
+        except Exception as e:  # noqa
+            self.bus.append.emit(f"<div style='color:#c96a5e'>Не отправлено: {e}</div>")
 
 
 class ChatsTab(QWidget):
     CATS = [("all", "Все"), ("user", "Личные"), ("group", "Группы"),
             ("channel", "Каналы"), ("saved", "Избранное")]
 
-    def __init__(self, worker):
+    def __init__(self, worker, db, on_send_to_ai):
         super().__init__()
         self.worker = worker
+        self.db = db
+        self.on_send_to_ai = on_send_to_ai
         self.category = "all"
         self.query = ""
         self.dialogs = []
+        self._sig = None
         self.bus = Bus(); self.bus.dialogs.connect(self._render)
         lay = QVBoxLayout(self); lay.setContentsMargins(18, 16, 18, 16); lay.setSpacing(10)
         head = QLabel("Чаты"); head.setObjectName("h"); lay.addWidget(head)
@@ -178,8 +240,7 @@ class ChatsTab(QWidget):
         chips = QHBoxLayout(); chips.setSpacing(6)
         self.cat_btns = {}
         for key, label in self.CATS:
-            b = QPushButton(label); b.setCheckable(True)
-            b.setChecked(key == "all")
+            b = QPushButton(label); b.setCheckable(True); b.setChecked(key == "all")
             b.clicked.connect(lambda _=False, k=key: self._set_cat(k))
             self.cat_btns[key] = b; chips.addWidget(b)
         chips.addStretch(1)
@@ -189,21 +250,23 @@ class ChatsTab(QWidget):
         self.search.textChanged.connect(self._on_search)
         lay.addWidget(self.search)
 
-        self.list = QListWidget(); lay.addWidget(self.list, 1)
-        self.hint = QLabel("Загружаю список чатов…"); self.hint.setObjectName("muted")
-        lay.addWidget(self.hint)
+        self.list = QListWidget()
+        self.list.itemDoubleClicked.connect(self._open_chat)
+        lay.addWidget(self.list, 1)
+        self.hint = QLabel("Загружаю список чатов…  (двойной клик — открыть чат)")
+        self.hint.setObjectName("muted"); lay.addWidget(self.hint)
 
-        self.timer = QTimer(self); self.timer.timeout.connect(self._fetch); self.timer.start(8000)
+        self.timer = QTimer(self); self.timer.timeout.connect(self._fetch); self.timer.start(12000)
         QTimer.singleShot(1500, self._fetch)
 
     def _set_cat(self, key):
         self.category = key
         for k, b in self.cat_btns.items():
             b.setChecked(k == key)
-        self._apply()
+        self._sig = None; self._apply()
 
     def _on_search(self, text):
-        self.query = text.strip().lower(); self._apply()
+        self.query = text.strip().lower(); self._sig = None; self._apply()
 
     def _fetch(self):
         if not self.worker.ready.is_set() or self.worker.error:
@@ -221,23 +284,65 @@ class ChatsTab(QWidget):
         self.dialogs = dialogs; self._apply()
 
     def _apply(self):
+        rows = [d for d in self.dialogs
+                if (self.category == "all" or d["type"] == self.category)
+                and (not self.query or self.query in d["name"].lower())]
+        sig = tuple((d["id"], d["unread"], d["preview"]) for d in rows)
+        if sig == self._sig:        # не пересобирать без изменений (убирает мигание)
+            return
+        self._sig = sig
         self.list.clear()
-        shown = 0
-        for d in self.dialogs:
-            if self.category != "all" and d["type"] != self.category:
-                continue
-            if self.query and self.query not in d["name"].lower():
-                continue
-            item = QListWidgetItem(); item.setSizeHint(QSize(0, 58))
-            self.list.addItem(item); self.list.setItemWidget(item, ChatRow(d))
-            shown += 1
-        self.hint.setText(f"{shown} чатов" if self.dialogs else "Загружаю список чатов…")
+        for d in rows:
+            item = QListWidgetItem(); item.setSizeHint(QSize(0, 60))
+            item.setData(Qt.UserRole, d)
+            self.list.addItem(item)
+            self.list.setItemWidget(item, ChatRow(d, self._menu))
+        self.hint.setText(f"{len(rows)} чатов  ·  двойной клик — открыть, ⋯ — меню")
+
+    def _open_chat(self, item):
+        d = item.data(Qt.UserRole)
+        if d:
+            ConversationDialog(d, self.worker).exec()
+
+    def _menu(self, d, btn):
+        m = QMenu(self)
+        a_off = m.addAction("Автоответ: выкл")
+        a_draft = m.addAction("Автоответ: черновик")
+        a_gen = m.addAction("Автоответ: авто — сгенерировать")
+        a_dlg = m.addAction("Автоответ: авто — вести диалог")
+        m.addSeparator()
+        a_open = m.addAction("Открыть чат")
+        a_ai = m.addAction("Переслать в нейросеть")
+        act = m.exec(btn.mapToGlobal(btn.rect().bottomLeft()))
+        if act is None:
+            return
+        from ..storage.models import ChatSettings
+        if act == a_off:
+            self._set_ar(d, "off", "generate")
+        elif act == a_draft:
+            self._set_ar(d, "draft", "generate")
+        elif act == a_gen:
+            self._set_ar(d, "auto", "generate")
+        elif act == a_dlg:
+            self._set_ar(d, "auto", "dialogue")
+        elif act == a_open:
+            ConversationDialog(d, self.worker).exec()
+        elif act == a_ai:
+            self.on_send_to_ai(d)
+
+    def _set_ar(self, d, mode, submode):
+        from ..storage.models import ChatSettings
+        self.db.set_chat_settings(ChatSettings(chat_id=d["id"], mode=mode,
+                                               auto_submode=submode, enabled=1))
+        self.hint.setText(f"Автоответ для «{d['name']}» → {mode}" +
+                          (f" ({submode})" if mode == "auto" else ""))
 
 
 # слова-триггеры действий: только тогда запускаем агента с инструментами
 ACTION_WORDS = ("отправ", "видео", "автоответ", "ответь", "почист", "чист",
                 "канал", "дедуп", "дубл", "найди", "поиск", "ищи", "удали",
-                "статистик", "счётчик", "счетчик")
+                "статистик", "счётчик", "счетчик", "напиши", "сообщени",
+                "id=", "чат:")
 
 
 def _needs_tools(text: str) -> bool:
@@ -441,7 +546,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("Nersiti"); self.resize(1040, 700)
         tabs = QTabWidget()
 
-        tabs.addTab(ChatsTab(worker), "Чаты")
+        tabs.addTab(ChatsTab(worker, db, self._send_to_ai), "Чаты")
         tabs.addTab(ChannelsTab(worker, ollama), "Чистка каналов")
         self.video_tab = VideoTab(videos)
         tabs.addTab(self.video_tab, "Видео")
@@ -481,6 +586,12 @@ class MainWindow(QMainWindow):
             self.video_tab._refresh()
         except Exception:
             pass
+
+    def _send_to_ai(self, d):
+        """«Переслать в нейросеть»: открыть ассистента и подставить id чата в ввод."""
+        self.chat.show(); self.chat.raise_()
+        self.chat.inp.setText(f"[чат: {d['name']} | id={d['id']}] ")
+        self.chat.inp.setFocus()
 
 
 def main() -> None:
