@@ -1,5 +1,8 @@
-# --- Telegram (userbot, MTProto) ---
+# --- Telegram (userbot/десктоп-клиент, MTProto) ---
 telethon==1.36.0
+
+# --- Десктоп-приложение (Windows, строгая чёрная тема) ---
+PySide6==6.7.2
 
 # --- Веб-панель ---
 fastapi==0.115.0

@@ -83,6 +83,21 @@ CREATE TABLE IF NOT EXISTS drafts (
     status     TEXT DEFAULT 'pending',
     created_at INTEGER DEFAULT 0
 );
+
+-- индекс видео для поиска дубликатов по хэшу содержимого
+CREATE TABLE IF NOT EXISTS videos (
+    hash       TEXT PRIMARY KEY,
+    file_path  TEXT,
+    size       INTEGER DEFAULT 0,
+    first_seen INTEGER DEFAULT 0,
+    seen_count INTEGER DEFAULT 1
+);
+
+-- именованные счётчики (напр. скинутых видео, удалённых дублей)
+CREATE TABLE IF NOT EXISTS counters (
+    name  TEXT PRIMARY KEY,
+    value INTEGER DEFAULT 0
+);
 """
 
 
@@ -256,6 +271,42 @@ class Database:
             return None
         return Draft(id=r["id"], chat_id=r["chat_id"], reply_to=r["reply_to"],
                      text=r["text"], status=r["status"], created_at=r["created_at"])
+
+    # ---- videos (дедупликация) ----
+    def register_video(self, vhash: str, file_path: str, size: int) -> tuple[bool, str]:
+        """Вернуть (is_duplicate, kept_path). Новый -> (False, file_path)."""
+        r = self.conn.execute("SELECT file_path FROM videos WHERE hash=?",
+                              (vhash,)).fetchone()
+        if r is not None:
+            self.conn.execute(
+                "UPDATE videos SET seen_count=seen_count+1 WHERE hash=?", (vhash,))
+            self.conn.commit()
+            return True, r["file_path"]
+        self.conn.execute(
+            "INSERT INTO videos(hash, file_path, size, first_seen) VALUES(?,?,?,?)",
+            (vhash, file_path, size, int(time.time())))
+        self.conn.commit()
+        return False, file_path
+
+    def video_index_stats(self) -> dict[str, int]:
+        unique = self.conn.execute("SELECT COUNT(*) c FROM videos").fetchone()["c"]
+        dupes = self.conn.execute(
+            "SELECT COALESCE(SUM(seen_count-1),0) c FROM videos").fetchone()["c"]
+        return {"unique": unique, "duplicates_seen": dupes}
+
+    # ---- counters ----
+    def incr_counter(self, name: str, by: int = 1) -> int:
+        self.conn.execute(
+            """INSERT INTO counters(name, value) VALUES(?, ?)
+               ON CONFLICT(name) DO UPDATE SET value=value+?""",
+            (name, by, by))
+        self.conn.commit()
+        return self.get_counter(name)
+
+    def get_counter(self, name: str) -> int:
+        r = self.conn.execute("SELECT value FROM counters WHERE name=?",
+                              (name,)).fetchone()
+        return int(r["value"]) if r else 0
 
     # ---- stats ----
     def stats(self) -> dict[str, int]:

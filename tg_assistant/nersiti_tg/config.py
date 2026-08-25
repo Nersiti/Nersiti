@@ -57,7 +57,22 @@ class AutoreplySettings:
 
 @dataclass
 class StorageSettings:
-    data_dir: str = "data"
+    # По умолчанию архив в домашней папке пользователя (Windows: C:\Users\<имя>\NersitiArchive)
+    data_dir: str = str(Path.home() / "NersitiArchive")
+
+
+@dataclass
+class SecuritySettings:
+    # SHA-256 пароля входа. По умолчанию — хэш "Logingood123337".
+    password_sha256: str = "5e05dd45cf5f98725ed53a5a230197c4bfe664d7bf871d75bcb68a83f29239ca"
+
+
+@dataclass
+class VideoSettings:
+    # Дедупликация одинаковых видео (по хэшу) и чистка дублей.
+    delete_duplicates: bool = True        # удалять дубликаты, оставляя один
+    near_duplicates: bool = False         # искать похожие (не только точные копии)
+    saved_folder: str = "videos"          # подпапка архива для «скинутых» видео
 
 
 @dataclass
@@ -77,6 +92,8 @@ class Settings:
     web: WebSettings = field(default_factory=WebSettings)
     archive: ArchiveSettings = field(default_factory=ArchiveSettings)
     autoreply: AutoreplySettings = field(default_factory=AutoreplySettings)
+    security: SecuritySettings = field(default_factory=SecuritySettings)
+    video: VideoSettings = field(default_factory=VideoSettings)
     secrets: Secrets = field(default_factory=Secrets)
 
     # --- производные пути ---
@@ -93,6 +110,10 @@ class Settings:
         return self.data_path / "media"
 
     @property
+    def video_dir(self) -> Path:
+        return self.data_path / "videos"
+
+    @property
     def persona_path(self) -> Path:
         return self.data_path / "persona.md"
 
@@ -103,6 +124,7 @@ class Settings:
     def ensure_dirs(self) -> None:
         self.data_path.mkdir(parents=True, exist_ok=True)
         self.media_dir.mkdir(parents=True, exist_ok=True)
+        self.video_dir.mkdir(parents=True, exist_ok=True)
 
     def as_dict(self) -> dict[str, Any]:
         d = asdict(self)
@@ -126,7 +148,8 @@ def _load_env(env_path: str) -> None:
 
 
 def _apply_yaml(settings: Settings, data: dict[str, Any]) -> None:
-    for section_name in ("storage", "ai", "web", "archive", "autoreply"):
+    for section_name in ("storage", "ai", "web", "archive", "autoreply",
+                          "security", "video"):
         section = data.get(section_name)
         if not isinstance(section, dict):
             continue

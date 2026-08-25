@@ -96,3 +96,54 @@ def test_autoreply_preset_and_draft():
            headers={"X-Sync-Token": "secret"})
     drafts = c.get("/api/drafts").json()
     assert any(d["text"] == "ок" for d in drafts)
+
+
+def test_password():
+    from nersiti_tg.auth import check_password, hash_password
+    h = hash_password("Logingood123337")
+    assert check_password("Logingood123337", h)
+    assert not check_password("wrong", h)
+
+
+def test_video_dedup_and_count(tmp_path):
+    from nersiti_tg.media.video_manager import VideoManager
+    settings, db, _c = _make()
+    vm = VideoManager(db, settings)
+
+    # три файла: два одинаковых (дубли), один другой
+    a = tmp_path / "a.mp4"; a.write_bytes(b"SAMEVIDEO")
+    b = tmp_path / "b.mp4"; b.write_bytes(b"SAMEVIDEO")
+    d = tmp_path / "d.mp4"; d.write_bytes(b"OTHER")
+
+    r1 = vm.drop_video(a); assert r1["status"] == "saved"
+    r2 = vm.drop_video(b); assert r2["status"] == "duplicate"  # тот же контент
+    r3 = vm.drop_video(d); assert r3["status"] == "saved"
+    assert vm.stats()["dropped_videos"] == 2      # скинуто уникальных
+    assert vm.stats()["duplicate_skipped"] == 1
+
+    # чистка папки с дублями
+    folder = tmp_path / "dump"; folder.mkdir()
+    (folder / "x.mp4").write_bytes(b"DUP")
+    (folder / "y.mp4").write_bytes(b"DUP")
+    (folder / "z.mp4").write_bytes(b"UNIQ")
+    rep = vm.dedup_folder(folder, delete=True)
+    assert rep["removed_count"] == 1 and rep["unique"] == 2
+    assert not (folder / "y.mp4").exists() or not (folder / "x.mp4").exists()
+
+
+def test_video_endpoints(tmp_path):
+    _, _db, c = _make()
+    v = tmp_path / "clip.mp4"; v.write_bytes(b"HELLOVIDEO")
+    r = c.post("/video/drop", json={"path": str(v)}).json()
+    assert r["status"] == "saved"
+    assert c.get("/video/stats").json()["dropped_videos"] == 1
+
+
+def test_channel_cleanup_parse():
+    from nersiti_tg.telegram.channels import parse_cleanup_decision
+    channels = [{"id": 10, "title": "Крипта"}, {"id": 20, "title": "Новости"},
+                {"id": 30, "title": "Мемы"}]
+    assert parse_cleanup_decision('{"leave":[10,30]}', channels) == [10, 30]
+    # fallback по числам
+    assert parse_cleanup_decision("оставить только новости, выйти из 10 и 30",
+                                  channels) == [10, 30]

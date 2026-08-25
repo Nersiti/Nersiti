@@ -20,6 +20,7 @@ from pydantic import BaseModel
 from ..ai.ollama_client import OllamaClient
 from ..ai.persona import Persona
 from ..autoreply import engine, queue
+from ..media.video_manager import VideoManager
 from ..storage.db import Database
 from ..storage.models import Chat, ChatSettings, Media, Message
 
@@ -61,9 +62,19 @@ class ChatSettingsIn(BaseModel):
     enabled: int = 1
 
 
+class VideoPath(BaseModel):
+    path: str
+
+
+class DedupFolder(BaseModel):
+    folder: str
+    delete: Optional[bool] = None
+
+
 def create_app(settings, db: Database, ollama: OllamaClient,
                persona: Persona) -> FastAPI:
     app = FastAPI(title="Nersiti backend")
+    videos = VideoManager(db, settings)
 
     def check_token(x_sync_token: str = Header(default="")) -> None:
         if x_sync_token != settings.secrets.sync_token:
@@ -166,6 +177,19 @@ def create_app(settings, db: Database, ollama: OllamaClient,
     async def api_reject(draft_id: int) -> dict[str, Any]:
         queue.reject(db, draft_id)
         return {"ok": True}
+
+    # ---------------- видео: дедупликация и подсчёт ----------------
+    @app.post("/video/drop")
+    async def video_drop(body: VideoPath) -> dict[str, Any]:
+        return videos.drop_video(body.path)
+
+    @app.post("/video/dedup")
+    async def video_dedup(body: DedupFolder) -> dict[str, Any]:
+        return videos.dedup_folder(body.folder, delete=body.delete)
+
+    @app.get("/video/stats")
+    async def video_stats() -> dict[str, Any]:
+        return videos.stats()
 
     @app.get("/api/persona")
     async def api_get_persona() -> dict[str, str]:
