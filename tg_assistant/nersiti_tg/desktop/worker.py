@@ -28,6 +28,7 @@ class TgWorker:
         self.thread: Optional[threading.Thread] = None
         self.ready = threading.Event()
         self.error: Optional[str] = None
+        self.me_id: int = 0
 
     def start(self) -> None:
         self.thread = threading.Thread(target=self._run, daemon=True)
@@ -52,9 +53,42 @@ class TgWorker:
             raise RuntimeError(
                 "Аккаунт не авторизован. Сначала войди через run_telegram.py "
                 "или nersiti_start.bat, затем открой приложение.")
+        try:
+            me = await self.client.get_me()
+            self.me_id = int(getattr(me, "id", 0) or 0)
+        except Exception:
+            self.me_id = 0
         self.collector = Collector(self.db, self.videos, self.settings,
                                    ollama=self.ollama, persona=self.persona)
         self.collector.register(self.client)
+
+    async def list_dialogs(self, limit: int = 300) -> list:
+        """Список диалогов как в Telegram: тип, непрочитанные, последнее сообщение."""
+        out = []
+        async for d in self.client.iter_dialogs(limit=limit):
+            ent = d.entity
+            if d.is_user:
+                typ = "saved" if (getattr(ent, "is_self", False) or
+                                  int(d.id) == self.me_id) else "user"
+            elif d.is_channel and not d.is_group:
+                typ = "channel"
+            else:
+                typ = "group"
+            msg = d.message
+            text = ""
+            if msg is not None:
+                text = getattr(msg, "message", "") or ""
+                if not text and getattr(msg, "media", None):
+                    text = "[медиа]"
+            out.append({
+                "id": int(d.id),
+                "name": ("Избранное" if typ == "saved" else (d.name or str(d.id))),
+                "type": typ,
+                "unread": int(getattr(d, "unread_count", 0) or 0),
+                "preview": text[:70],
+                "date": int(d.date.timestamp()) if getattr(d, "date", None) else 0,
+            })
+        return out
 
     def submit(self, coro) -> Future:
         """Выполнить корутину в loop воркера. Вернуть concurrent.futures.Future."""

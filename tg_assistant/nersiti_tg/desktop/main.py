@@ -17,7 +17,7 @@ import asyncio
 import sys
 import threading
 
-from PySide6.QtCore import Qt, QTimer, QObject, Signal
+from PySide6.QtCore import Qt, QTimer, QObject, Signal, QSize
 from PySide6.QtWidgets import (
     QApplication, QDialog, QLineEdit, QVBoxLayout, QHBoxLayout, QLabel,
     QPushButton, QMainWindow, QWidget, QTabWidget, QListWidget, QListWidgetItem,
@@ -63,6 +63,7 @@ QPushButton { background:#16181c; border:1px solid #262a30; border-radius:9px;
 QPushButton:hover { background:#1d2025; border-color:#31363d; }
 QPushButton#primary { background:#213445; border:1px solid #305777; color:#e0ecf9; font-weight:600; }
 QPushButton#primary:hover { background:#274257; }
+QPushButton:checked { background:#213445; border-color:#305777; color:#e0ecf9; }
 QPushButton#danger { background:#2a1918; border:1px solid #5a2f2a; color:#e88b80; }
 QPushButton#danger:hover { background:#331d1b; }
 
@@ -116,6 +117,121 @@ class PasswordDialog(QDialog):
 class Bus(QObject):
     text = Signal(str)
     channels = Signal(list)
+    dialogs = Signal(list)
+
+
+AVATAR_COLORS = ["#5b8dd6", "#c96a5e", "#7bb67f", "#b98bd0", "#d0a24a",
+                 "#5aa9a0", "#c77fa0", "#8f9bd6"]
+
+
+def _initials(name: str) -> str:
+    parts = [p for p in (name or "").split() if p]
+    if not parts:
+        return "?"
+    if len(parts) == 1:
+        return parts[0][:2].upper()
+    return (parts[0][0] + parts[1][0]).upper()
+
+
+class ChatRow(QWidget):
+    """Строка чата как в Telegram: аватар-инициалы, имя, превью, время, непрочитанные."""
+    def __init__(self, d: dict):
+        super().__init__()
+        lay = QHBoxLayout(self); lay.setContentsMargins(6, 6, 6, 6); lay.setSpacing(11)
+        av = QLabel(_initials(d["name"])); av.setFixedSize(42, 42)
+        av.setAlignment(Qt.AlignCenter)
+        col = AVATAR_COLORS[d["id"] % len(AVATAR_COLORS)]
+        if d["type"] == "saved":
+            col = "#3a6ea5"
+        av.setStyleSheet(
+            f"background:{col};border-radius:21px;color:#fff;font-weight:700;font-size:15px;")
+        lay.addWidget(av)
+        mid = QVBoxLayout(); mid.setSpacing(3)
+        name = QLabel(d["name"]); name.setStyleSheet("font-weight:600;font-size:14px;color:#eef1f5;")
+        prev = QLabel(d.get("preview") or " "); prev.setStyleSheet("color:#818892;font-size:12px;")
+        prev.setMaximumWidth(360)
+        mid.addWidget(name); mid.addWidget(prev)
+        lay.addLayout(mid, 1)
+        right = QVBoxLayout(); right.setSpacing(4); right.setAlignment(Qt.AlignRight)
+        if d.get("unread"):
+            badge = QLabel(str(d["unread"])); badge.setAlignment(Qt.AlignCenter)
+            badge.setStyleSheet(
+                "background:#5b8dd6;color:#fff;border-radius:9px;padding:1px 7px;font-size:11px;font-weight:700;")
+            right.addWidget(badge, 0, Qt.AlignRight)
+        lay.addLayout(right)
+
+
+class ChatsTab(QWidget):
+    CATS = [("all", "Все"), ("user", "Личные"), ("group", "Группы"),
+            ("channel", "Каналы"), ("saved", "Избранное")]
+
+    def __init__(self, worker):
+        super().__init__()
+        self.worker = worker
+        self.category = "all"
+        self.query = ""
+        self.dialogs = []
+        self.bus = Bus(); self.bus.dialogs.connect(self._render)
+        lay = QVBoxLayout(self); lay.setContentsMargins(18, 16, 18, 16); lay.setSpacing(10)
+        head = QLabel("Чаты"); head.setObjectName("h"); lay.addWidget(head)
+
+        chips = QHBoxLayout(); chips.setSpacing(6)
+        self.cat_btns = {}
+        for key, label in self.CATS:
+            b = QPushButton(label); b.setCheckable(True)
+            b.setChecked(key == "all")
+            b.clicked.connect(lambda _=False, k=key: self._set_cat(k))
+            self.cat_btns[key] = b; chips.addWidget(b)
+        chips.addStretch(1)
+        lay.addLayout(chips)
+
+        self.search = QLineEdit(); self.search.setPlaceholderText("Поиск по чатам…")
+        self.search.textChanged.connect(self._on_search)
+        lay.addWidget(self.search)
+
+        self.list = QListWidget(); lay.addWidget(self.list, 1)
+        self.hint = QLabel("Загружаю список чатов…"); self.hint.setObjectName("muted")
+        lay.addWidget(self.hint)
+
+        self.timer = QTimer(self); self.timer.timeout.connect(self._fetch); self.timer.start(8000)
+        QTimer.singleShot(1500, self._fetch)
+
+    def _set_cat(self, key):
+        self.category = key
+        for k, b in self.cat_btns.items():
+            b.setChecked(k == key)
+        self._apply()
+
+    def _on_search(self, text):
+        self.query = text.strip().lower(); self._apply()
+
+    def _fetch(self):
+        if not self.worker.ready.is_set() or self.worker.error:
+            return
+        threading.Thread(target=self._fetch_bg, daemon=True).start()
+
+    def _fetch_bg(self):
+        try:
+            res = self.worker.submit(self.worker.list_dialogs()).result(timeout=40)
+            self.bus.dialogs.emit(res)
+        except Exception:
+            pass
+
+    def _render(self, dialogs):
+        self.dialogs = dialogs; self._apply()
+
+    def _apply(self):
+        self.list.clear()
+        shown = 0
+        for d in self.dialogs:
+            if self.category != "all" and d["type"] != self.category:
+                continue
+            if self.query and self.query not in d["name"].lower():
+                continue
+            item = QListWidgetItem(); item.setSizeHint(QSize(0, 58))
+            self.list.addItem(item); self.list.setItemWidget(item, ChatRow(d))
+            shown += 1
+        self.hint.setText(f"{shown} чатов" if self.dialogs else "Загружаю список чатов…")
 
 
 # слова-триггеры действий: только тогда запускаем агента с инструментами
@@ -204,15 +320,30 @@ class VideoTab(QWidget):
         self.stats = QLabel(); self.stats.setObjectName("muted")
         drop = QPushButton("Скинуть видео (файлы)"); drop.setObjectName("primary"); drop.clicked.connect(self._drop)
         dedup = QPushButton("Найти и удалить дубли в папке…"); dedup.clicked.connect(self._dedup)
-        for w in (head, self.stats, drop, dedup):
+        row = QHBoxLayout(); row.setSpacing(8); row.addWidget(drop); row.addWidget(dedup); row.addStretch(1)
+        self.vlist = QListWidget()
+        for w in (head, self.stats):
             lay.addWidget(w)
-        lay.addStretch(1); self._refresh()
+        lay.addLayout(row)
+        lay.addWidget(QLabel("Сохранённые видео:"))
+        lay.addWidget(self.vlist, 1)
+        self._refresh()
 
     def _refresh(self):
         s = self.videos.stats()
         self.stats.setText(
             f"Скинуто: {s['dropped_videos']} · Уникальных: {s['unique']} · "
             f"Пропущено дублей: {s['duplicate_skipped']} · Удалено дублей: {s['duplicates_removed']}")
+        # список файлов в папке видео
+        try:
+            files = sorted(self.videos.saved_dir.glob("*"))
+            if self.vlist.count() != len([f for f in files if f.is_file()]):
+                self.vlist.clear()
+                for f in files:
+                    if f.is_file():
+                        self.vlist.addItem(f.name)
+        except Exception:
+            pass
 
     def _drop(self):
         files, _ = QFileDialog.getOpenFileNames(self, "Выбрать видео")
@@ -310,13 +441,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("Nersiti"); self.resize(1040, 700)
         tabs = QTabWidget()
 
-        self.chats = QListWidget()
-        chats_wrap = QWidget(); cw = QVBoxLayout(chats_wrap)
-        cw.setContentsMargins(18, 16, 18, 16); cw.setSpacing(10)
-        h1 = QLabel("Чаты и каналы"); h1.setObjectName("h")
-        self.chats_count = QLabel(""); self.chats_count.setObjectName("muted")
-        cw.addWidget(h1); cw.addWidget(self.chats_count); cw.addWidget(self.chats, 1)
-        tabs.addTab(chats_wrap, "Чаты и каналы")
+        tabs.addTab(ChatsTab(worker), "Чаты")
         tabs.addTab(ChannelsTab(worker, ollama), "Чистка каналов")
         self.video_tab = VideoTab(videos)
         tabs.addTab(self.video_tab, "Видео")
@@ -346,26 +471,12 @@ class MainWindow(QMainWindow):
         self._tick()
 
     def _tick(self):
-        # статус воркера
         if self.worker.error:
             self.status.setText(f"  Telegram: {self.worker.error[:60]}  ")
         elif self.worker.ready.is_set():
             self.status.setText("  Telegram: подключён · архивация идёт  ")
-        # обновить список чатов
-        try:
-            cur = self.chats.currentRow()
-            self.chats.clear()
-            for c in self.db.list_chats():
-                self.chats.addItem(QListWidgetItem(c["title"] or str(c["chat_id"])))
-            n = self.chats.count()
-            if n == 0:
-                self.chats.addItem("Пока пусто — идёт первичная загрузка…")
-            else:
-                self.chats_count.setText(f"{n} диалогов в архиве")
-            if cur >= 0:
-                self.chats.setCurrentRow(min(cur, self.chats.count() - 1))
-        except Exception:
-            pass
+        else:
+            self.status.setText("  Telegram: подключение…  ")
         try:
             self.video_tab._refresh()
         except Exception:
