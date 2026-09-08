@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="440" viewBox="0 0 900 440" font-family="DejaVu Sans, Arial, sans-serif">
+<defs><pattern id="hatch" width="8" height="8" patternTransform="rotate(45)" patternUnits="userSpaceOnUse"><line x1="0" y1="0" x2="0" y2="8" stroke="#4a6fa5" stroke-width="1.1"/></pattern></defs>
+<rect width="900" height="440" fill="#ffffff"/>
+<g fill="none" stroke="#1b2430" stroke-width="2">
+<circle cx="210.0" cy="220.0" r="120.0"/>
+<circle cx="210.0" cy="220.0" r="70.0"/>
+<circle cx="210.0" cy="220.0" r="40.0"/>
+<circle cx="277.2" cy="152.8" r="11.0"/>
+<circle cx="142.8" cy="152.8" r="11.0"/>
+<circle cx="142.8" cy="287.2" r="11.0"/>
+<circle cx="277.2" cy="287.2" r="11.0"/>
+</g>
+<g fill="none" stroke="#c0392b" stroke-width="1" stroke-dasharray="14 4 3 4">
+<line x1="74.0" y1="220.0" x2="346.0" y2="220.0"/>
+<line x1="210.0" y1="84.0" x2="210.0" y2="356.0"/>
+<circle cx="210.0" cy="220.0" r="95.0"/>
+<line x1="640.0" y1="230.0" x2="640.0" y2="342.0"/>
+</g>
+<g stroke="#1b2430" stroke-width="2" fill="url(#hatch)">
+<rect x="680.0" y="260.0" width="30.0" height="60.0"/>
+<rect x="570.0" y="260.0" width="30.0" height="60.0"/>
+<rect x="710.0" y="292.0" width="14.0" height="28.0"/>
+<rect x="556.0" y="292.0" width="14.0" height="28.0"/>
+<rect x="746.0" y="292.0" width="14.0" height="28.0"/>
+<rect x="520.0" y="292.0" width="14.0" height="28.0"/>
+</g>
+<g fill="#1b2430" font-size="15">
+<text x="164.0" y="76.0">Вид спереди</text>
+<text x="610.0" y="214.0">Разрез</text>
+<text x="326.0" y="370.0">&#216;120</text>
+<text x="194.0" y="214.0">&#216;40</text>
+<text x="256.0" y="308.0">&#216;70</text>
+<text x="249.0" y="115.0">4&#215;&#216;11 на &#216;95</text>
+<text x="772.0" y="311.0">14</text>
+<text x="772.0" y="266.0">30 (полная высота)</text>
+<text x="24" y="418" font-size="13" fill="#5a6472">Деталь «Фланец» — эскиз для наглядности, не чертёж по ЕСКД. Модель строит kompas3d/flange.py</text>
+</g>
+</svg>
