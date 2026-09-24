@@ -1,0 +1,34 @@
+# Промпты для автопостинга в канал-витрину.
+# Формат: подпись для поста (RU) | промпт для нейросети (EN) | стиль (auto, photo, anime, art, 3d, cyber, oil, logo)
+# Добавляй свои строки — бот выбирает случайную.
+
+Рыжий кот-астронавт смотрит на Землю из иллюминатора | ginger cat astronaut in a detailed spacesuit looking at planet Earth through a spaceship window, reflections on the helmet | photo
+Уютная кофейня в дождливом Токио | cozy small coffee shop in rainy Tokyo at night, warm light from windows, wet street reflections | anime
+Замок на облаках на закате | majestic fantasy castle floating on clouds at golden sunset, waterfalls falling into the sky | art
+Лиса в скандинавском лесу зимой | red fox sitting in a snowy scandinavian pine forest, soft morning light, snowflakes | photo
+Киберпанк-Москва будущего | futuristic Moscow in 2090, neon signs in cyrillic, flying cars, rain, cinematic night | cyber
+Маленький робот поливает цветы | tiny cute robot watering flowers on a sunny balcony, pastel colors | 3d
+Старый маяк во время шторма | old lighthouse on a cliff during a dramatic storm, huge waves, lightning | oil
+Волшебная библиотека в дереве | magical library inside a giant ancient tree, glowing books, floating lanterns | art
+Дракон спит на горе золота | sleeping dragon on a mountain of gold coins in a vast cave, rays of light | art
+Панда-самурай в бамбуковом лесу | panda samurai warrior in a bamboo forest, cherry blossom petals, epic pose | anime
+Горное озеро на рассвете | crystal clear mountain lake at sunrise, mist over the water, alpine peaks reflection | photo
+Капибара в горячем источнике | capybara relaxing in a japanese hot spring with a yuzu on its head, steam, snow | photo
+Город внутри стеклянной банки | miniature city inside a glass jar on a wooden desk, tiny lights, tilt-shift | 3d
+Космический кит среди звёзд | giant whale swimming through a nebula among stars and galaxies | art
+Средневековый рынок в фэнтези-городе | bustling medieval fantasy market street, colorful stalls, lanterns, people | oil
+Неоновый самурай под дождём | lone samurai with a glowing neon katana standing in the rain, cyberpunk alley | cyber
+Домик хоббита весной | cozy hobbit house in green hills in spring, round door, flowers, sunlight | art
+Северное сияние над деревянной избой | aurora borealis over a wooden russian izba in the snowy taiga, starry night | photo
+Сова-волшебник со свитком | wise owl wizard wearing a tiny hat, reading a glowing scroll, candlelight | art
+Корги-космонавт на Марсе | corgi in a space suit exploring Mars, red dunes, earth in the sky | 3d
+Бабочка из витражного стекла | butterfly made of colorful stained glass, sunlight shining through, macro | art
+Парижское кафе в стиле импрессионизма | parisian street cafe at evening, impressionism, warm lights, people | oil
+Аниме-девушка на крыше под звёздами | anime girl sitting on a rooftop watching a starry sky and a comet, city lights below | anime
+Подводный город атлантов | underwater atlantis city with glowing domes, fish and whales, sun rays through water | art
+Пустынный караван под двумя лунами | desert caravan of camels under two giant moons, sci-fi, dunes | art
+Мотоцикл будущего | concept art of a futuristic electric motorcycle, studio lighting, sleek design | 3d
+Осенний парк в Санкт-Петербурге | autumn park in Saint Petersburg, golden leaves, old lanterns, soft fog | photo
+Чайный домик в горах Китая | chinese tea house on a mountain cliff among clouds, pine trees, sunrise | art
+Лого кофейни с совой | coffee shop logo with an owl holding a coffee cup | logo
+Лого IT-стартапа с ракетой | tech startup logo with a minimal rocket and circuit lines | logo

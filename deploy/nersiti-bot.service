@@ -1,0 +1,22 @@
+# Запуск без Docker через systemd.
+#   sudo useradd -r -m -d /opt/nersiti bot
+#   sudo -u bot git clone <repo> /opt/nersiti && cd /opt/nersiti
+#   sudo -u bot python3 -m venv .venv && sudo -u bot .venv/bin/pip install -r requirements.txt
+#   sudo -u bot cp .env.example .env && sudo -u bot nano .env
+#   sudo cp deploy/nersiti-bot.service /etc/systemd/system/ && sudo systemctl enable --now nersiti-bot
+#   journalctl -u nersiti-bot -f
+[Unit]
+Description=Nersiti AI Telegram bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=bot
+WorkingDirectory=/opt/nersiti
+ExecStart=/opt/nersiti/.venv/bin/python -m app
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

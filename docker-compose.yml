@@ -1,0 +1,51 @@
+# Запуск: docker compose up -d --build
+# С PostgreSQL:  docker compose --profile postgres up -d --build   (и поменяй DATABASE_URL в .env)
+# С Ollama в Docker на сервере с NVIDIA GPU: docker compose --profile gpu up -d --build
+services:
+  bot:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - ./data:/app/data
+      - ./promo:/app/promo:ro
+      - ./workflows:/app/workflows:ro
+    extra_hosts:
+      # доступ к Ollama/ComfyUI, запущенным на этой же машине: http://host.docker.internal:11434
+      - "host.docker.internal:host-gateway"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  postgres:
+    image: postgres:16-alpine
+    profiles: ["postgres"]
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: bot
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change_me_please}
+      POSTGRES_DB: bot
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  ollama:
+    image: ollama/ollama:latest
+    profiles: ["gpu"]
+    restart: unless-stopped
+    environment:
+      OLLAMA_KEEP_ALIVE: "10m"
+    volumes:
+      - ollama:/root/.ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+volumes:
+  pgdata:
+  ollama:
