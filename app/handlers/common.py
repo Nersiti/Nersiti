@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from aiogram import F, Router
+from aiogram import Bot, F, Router
 from aiogram.enums import ChatMemberStatus, ChatType
 from aiogram.filters import Command, CommandObject, CommandStart
 from aiogram.types import CallbackQuery, ChatMemberUpdated, Message
@@ -10,29 +10,26 @@ from app import texts
 from app.context import Services
 from app.db import repo
 from app.db.models import User
+from app.handlers.game import send_card
 from app.services.growth import apply_start_payload
 
 router = Router(name="common")
 
 
 @router.message(CommandStart())
-async def cmd_start(message: Message, command: CommandObject, user: User, is_new_user: bool, ctx: Services) -> None:
+async def cmd_start(
+    message: Message, command: CommandObject, user: User, is_new_user: bool, ctx: Services, bot: Bot
+) -> None:
     payload = (command.args or "").strip()
     extra = await apply_start_payload(ctx, user, payload) if is_new_user and payload else None
-    await message.answer(texts.welcome(user.first_name or "друг", ctx.settings), reply_markup=kb.main_kb())
+    world = await ctx.game.world_size()
+    await message.answer(texts.welcome(user.first_name or "друг", ctx.settings, world), reply_markup=kb.main_kb())
     if extra:
         await message.answer(extra)
-
-
-@router.message(Command("help"))
-async def cmd_help(message: Message, ctx: Services) -> None:
-    await message.answer(texts.help_text(ctx.settings))
-
-
-@router.callback_query(kb.MenuCb.filter(F.action == "help"))
-async def cb_help(callback: CallbackQuery, ctx: Services) -> None:
-    await callback.message.answer(texts.help_text(ctx.settings))  # type: ignore[union-attr]
-    await callback.answer()
+    if payload.startswith("c_") and payload[2:].isdigit():
+        card = await ctx.game.get_card(int(payload[2:]))
+        if card is not None:
+            await send_card(bot, message.chat.id, card, user.id, ctx)
 
 
 @router.message(Command("terms", "privacy"))

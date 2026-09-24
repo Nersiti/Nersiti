@@ -37,7 +37,7 @@ PENDING_TTL = timedelta(hours=24)
 class Fulfillment:
     user_id: int
     product: Product
-    credits: int
+    crystals: int
     premium_until: datetime | None
     referrer_id: int | None
     referrer_bonus: int
@@ -51,8 +51,9 @@ async def fulfill(
     s: AsyncSession, settings: Settings, user_id: int, product: Product, sub_until: datetime | None = None
 ) -> Fulfillment:
     now = utcnow()
-    if product.credits:
-        await repo.add_credits(s, user_id, product.credits)
+    crystals = product.crystals + (settings.lord_bonus_crystals if product.premium_days else 0)
+    if crystals:
+        await repo.add_crystals(s, user_id, crystals)
     until = None
     if product.premium_days:
         until = await repo.extend_premium(s, user_id, product.premium_days, now, at_least=sub_until)
@@ -65,9 +66,9 @@ async def fulfill(
             await s.execute(
                 update(User)
                 .where(User.id == referrer_id)
-                .values(credits=User.credits + bonus, ref_earned=User.ref_earned + bonus)
+                .values(crystals=User.crystals + bonus, ref_earned=User.ref_earned + bonus)
             )
-    return Fulfillment(user_id, product, product.credits, until, referrer_id, bonus)
+    return Fulfillment(user_id, product, crystals, until, referrer_id, bonus)
 
 
 class PaymentService:
@@ -362,8 +363,9 @@ class PaymentService:
                 .where(User.id == payment.user_id)
                 .values(stars_spent=case((spent < 0, 0), else_=spent))
             )
-            if product and product.credits:
-                await repo.add_credits(s, payment.user_id, -product.credits)
+            if product:
+                taken = product.crystals + (self.settings.lord_bonus_crystals if product.premium_days else 0)
+                await repo.add_crystals(s, payment.user_id, -taken)
             if product and product.premium_days:
                 until = await s.scalar(select(User.premium_until).where(User.id == payment.user_id))
                 if until:

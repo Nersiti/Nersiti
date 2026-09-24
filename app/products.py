@@ -13,12 +13,12 @@ class Product:
     code: str
     title: str  # до 32 символов — ограничение Telegram для счёта
     description: str  # до 255 символов
-    stars: int  # цена в Telegram Stars
-    rub: int  # цена в рублях (целые рубли)
-    credits: int = 0
-    premium_days: int = 0
-    subscription: bool = False  # при оплате Stars — автопродление каждые 30 дней
-    ref_value: int = 0  # база для реферальной комиссии (в кредитах)
+    stars: int
+    rub: int  # целые рубли
+    crystals: int = 0
+    premium_days: int = 0  # статус «Лорд»
+    subscription: bool = False  # при оплате звёздами — автопродление каждые 30 дней
+    ref_value: int = 0  # база для реферальной комиссии (в кристаллах)
     badge: str = ""
 
     @property
@@ -28,63 +28,62 @@ class Product:
 
 CATALOG: tuple[Product, ...] = (
     Product(
-        code="prem_month",
-        title="Premium на 30 дней",
-        description="Безлимитный ИИ-чат, до 60 картинок в день, приоритетная очередь, без рекламы. "
-        "При оплате звёздами продлевается автоматически, отключить можно в любой момент.",
-        stars=299,
-        rub=499,
+        code="lord_month",
+        title="👑 Лорд на 30 дней",
+        description="10 слов в день вместо 3, 30 боёв, повышенный шанс легендарных карт, "
+        "комиссия 5%, золотая корона в топе и +100 💎 при каждом продлении. Отключить можно в любой момент.",
+        stars=249,
+        rub=399,
         premium_days=30,
         subscription=True,
         ref_value=250,
         badge="🔥",
     ),
     Product(
-        code="prem_week",
-        title="Premium на 7 дней",
-        description="Попробуйте все возможности Premium на неделю: безлимитный чат, "
-        "до 60 картинок в день, приоритет.",
-        stars=99,
-        rub=179,
+        code="lord_week",
+        title="👑 Лорд на 7 дней",
+        description="Неделя статуса Лорда: 10 слов в день, 30 боёв, повышенный шанс легендарных карт и +100 💎.",
+        stars=79,
+        rub=149,
         premium_days=7,
         ref_value=80,
     ),
     Product(
-        code="c50",
-        title="50 кредитов",
-        description="50 кредитов: 50 сообщений ИИ или 10 картинок. Кредиты не сгорают.",
+        code="cr100",
+        title="100 кристаллов",
+        description="100 💎 — на перья для новых слов, захваты, щиты и аукционы.",
         stars=50,
         rub=99,
-        credits=50,
-        ref_value=50,
+        crystals=100,
+        ref_value=100,
     ),
     Product(
-        code="c150",
-        title="150 кредитов",
-        description="150 кредитов (выгода 14%): 150 сообщений ИИ или 30 картинок. Кредиты не сгорают.",
-        stars=129,
+        code="cr300",
+        title="300 кристаллов",
+        description="300 💎 (выгода 7%) — на перья, захваты, щиты и аукционы.",
+        stars=139,
         rub=249,
-        credits=150,
-        ref_value=150,
+        crystals=300,
+        ref_value=300,
     ),
     Product(
-        code="c500",
-        title="500 кредитов",
-        description="500 кредитов (выгода 24%): 500 сообщений ИИ или 100 картинок. Кредиты не сгорают.",
-        stars=379,
+        code="cr1000",
+        title="1000 кристаллов",
+        description="1000 💎 (выгода 20%) — хватит, чтобы выиграть аукцион легендарного слова.",
+        stars=399,
         rub=690,
-        credits=500,
-        ref_value=500,
+        crystals=1000,
+        ref_value=1000,
         badge="⭐",
     ),
     Product(
-        code="c1500",
-        title="1500 кредитов",
-        description="1500 кредитов (выгода 34%): 1500 сообщений ИИ или 300 картинок. Кредиты не сгорают.",
+        code="cr3000",
+        title="3000 кристаллов",
+        description="3000 💎 (выгода 34%) — для настоящих магнатов мира слов.",
         stars=990,
         rub=1790,
-        credits=1500,
-        ref_value=1500,
+        crystals=3000,
+        ref_value=3000,
     ),
 )
 

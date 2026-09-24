@@ -17,13 +17,6 @@ log = logging.getLogger(__name__)
 
 Messages = list[dict[str, str]]
 
-TRANSLATE_PROMPT = (
-    "You turn user requests into prompts for an image generation model (Stable Diffusion / Flux). "
-    "Translate the request to English, keep every detail, do not add new objects. "
-    "Output only the prompt text without quotes or explanations."
-)
-
-
 class LLMError(RuntimeError):
     pass
 
@@ -53,8 +46,8 @@ class OpenAICompatLLM:
         return {
             "model": self.settings.llm_model,
             "messages": messages,
-            "max_tokens": max_tokens or self.settings.llm_max_tokens,
-            "temperature": self.settings.llm_temperature if temperature is None else temperature,
+            "max_tokens": max_tokens or 800,
+            "temperature": 0.8 if temperature is None else temperature,
             "stream": stream,
         }
 
@@ -107,16 +100,16 @@ class OpenAICompatLLM:
 
 
 class MockLLM:
-    """Offline stub: lets you run the bot and tests without a neural network."""
+    """No neural network: returns an empty answer, and the game falls back to templates."""
 
     async def complete(
         self, messages: Messages, max_tokens: int | None = None, temperature: float | None = None
     ) -> str:
-        return f"Эхо: {messages[-1]['content']}"
+        return ""
 
     async def stream(self, messages: Messages) -> AsyncIterator[str]:
-        for word in f"Эхо: {messages[-1]['content']}".split(" "):
-            yield word + " "
+        return
+        yield ""  # pragma: no cover — делает функцию асинхронным генератором
 
     async def close(self) -> None:
         return None
@@ -126,21 +119,3 @@ def create_llm(settings: Settings) -> LLMClient:
     if settings.llm_backend == "mock":
         return MockLLM()
     return OpenAICompatLLM(settings)
-
-
-async def to_image_prompt(llm: LLMClient, text: str, timeout: float = 45.0) -> str:
-    """Translate a Russian description into an English prompt; on error, return it unchanged."""
-    try:
-        result = await asyncio.wait_for(
-            llm.complete(
-                [{"role": "system", "content": TRANSLATE_PROMPT}, {"role": "user", "content": text}],
-                max_tokens=300,
-                temperature=0.2,
-            ),
-            timeout,
-        )
-    except Exception as e:  # noqa: BLE001 - перевод не критичен
-        log.warning("Prompt translation failed: %r", e)
-        return text
-    result = result.strip().strip('"').strip()
-    return result or text

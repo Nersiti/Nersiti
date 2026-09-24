@@ -25,14 +25,19 @@ class UserMiddleware(BaseMiddleware):
         data: dict[str, Any],
     ) -> Any:
         tg_user: TgUser | None = data.get("event_from_user")
-        if tg_user is None or tg_user.is_bot:
+        if tg_user is None or tg_user.is_bot or _is_inline(event):
+            # инлайн-запросы приходят и от тех, кто ещё не открывал бота, — не записываем их в игроки
             return await handler(event, data)
-        user, is_new = await repo.get_or_create_user(self.ctx.db, tg_user, self.ctx.settings.start_bonus)
+        user, is_new = await repo.get_or_create_user(self.ctx.db, tg_user, self.ctx.settings.start_crystals)
         if user.is_banned and not self.ctx.settings.is_admin(user.id) and not _is_payment(event):
             return None
         data["user"] = user
         data["is_new_user"] = is_new
         return await handler(event, data)
+
+
+def _is_inline(event: TelegramObject) -> bool:
+    return isinstance(event, Update) and bool(event.inline_query or event.chosen_inline_result)
 
 
 def _is_payment(event: TelegramObject) -> bool:

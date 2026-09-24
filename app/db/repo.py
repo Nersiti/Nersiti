@@ -12,7 +12,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.database import Database
-from app.db.models import ChatMessage, KeyValue, Payment, PromoCode, PromoUse, Usage, User
+from app.db.models import Battle, Card, KeyValue, Payment, PromoCode, PromoUse, User
 from app.utils import local_day_start_utc, utcnow
 
 TOUCH_INTERVAL = 60  # секунд между обновлениями last_seen_at
@@ -21,7 +21,7 @@ TOUCH_INTERVAL = 60  # секунд между обновлениями last_see
 # ---------- users ----------
 
 
-async def get_or_create_user(db: Database, tg_user: TgUser, start_bonus: int) -> tuple[User, bool]:
+async def get_or_create_user(db: Database, tg_user: TgUser, start_crystals: int) -> tuple[User, bool]:
     now = utcnow()
     first_name = (tg_user.first_name or "")[:128]
     username = tg_user.username[:64] if tg_user.username else None
@@ -47,7 +47,7 @@ async def get_or_create_user(db: Database, tg_user: TgUser, start_bonus: int) ->
             language_code=tg_user.language_code,
             created_at=now,
             last_seen_at=now,
-            credits=start_bonus,
+            crystals=start_crystals,
         )
         s.add(user)
         try:
@@ -76,11 +76,11 @@ async def set_fields(s: AsyncSession, user_id: int, **values: object) -> None:
     await s.execute(update(User).where(User.id == user_id).values(**values))
 
 
-async def add_credits(s: AsyncSession, user_id: int, amount: int) -> None:
-    """Add (or remove, if negative) credits; balance never drops below zero."""
-    new_value = User.credits + amount
+async def add_crystals(s: AsyncSession, user_id: int, amount: int) -> None:
+    """Add (or remove, if negative) crystals; balance never drops below zero."""
+    new_value = User.crystals + amount
     await s.execute(
-        update(User).where(User.id == user_id).values(credits=case((new_value < 0, 0), else_=new_value))
+        update(User).where(User.id == user_id).values(crystals=case((new_value < 0, 0), else_=new_value))
     )
 
 
@@ -100,57 +100,16 @@ async def count_referrals(s: AsyncSession, user_id: int) -> int:
     return int(await s.scalar(select(func.count()).select_from(User).where(User.referrer_id == user_id)) or 0)
 
 
-# ---------- dialog history ----------
-
-
-async def get_history(s: AsyncSession, user_id: int, limit: int) -> list[dict[str, str]]:
-    if limit <= 0:
-        return []
-    rows = (
-        await s.scalars(
-            select(ChatMessage)
-            .where(ChatMessage.user_id == user_id)
-            .order_by(ChatMessage.id.desc())
-            .limit(limit)
-        )
-    ).all()
-    return [{"role": m.role, "content": m.content} for m in reversed(rows)]
-
-
-async def save_dialog(s: AsyncSession, user_id: int, question: str, answer: str, keep: int = 60) -> None:
-    now = utcnow()
-    s.add_all(
-        [
-            ChatMessage(user_id=user_id, role="user", content=question, created_at=now),
-            ChatMessage(user_id=user_id, role="assistant", content=answer, created_at=now),
-        ]
-    )
-    await s.flush()
-    threshold = await s.scalar(
-        select(ChatMessage.id)
-        .where(ChatMessage.user_id == user_id)
-        .order_by(ChatMessage.id.desc())
-        .offset(keep)
-        .limit(1)
-    )
-    if threshold is not None:
-        await s.execute(delete(ChatMessage).where(ChatMessage.user_id == user_id, ChatMessage.id <= threshold))
-
-
-async def clear_history(s: AsyncSession, user_id: int) -> None:
-    await s.execute(delete(ChatMessage).where(ChatMessage.user_id == user_id))
-
-
 # ---------- promo codes ----------
 
 
 async def create_promo(
-    s: AsyncSession, code: str, credits: int, max_uses: int, premium_days: int, expires_at: datetime | None
+    s: AsyncSession, code: str, crystals: int, max_uses: int, premium_days: int, expires_at: datetime | None
 ) -> None:
     s.add(
         PromoCode(
             code=code.upper(),
-            credits=credits,
+            crystals=crystals,
             premium_days=premium_days,
             max_uses=max_uses,
             used=0,
@@ -186,8 +145,8 @@ async def activate_promo(s: AsyncSession, code: str, user_id: int) -> PromoCode 
         return "exhausted"
     s.add(PromoUse(code=code, user_id=user_id, created_at=now))
     await s.flush()
-    if promo.credits:
-        await add_credits(s, user_id, promo.credits)
+    if promo.crystals:
+        await add_crystals(s, user_id, promo.crystals)
     if promo.premium_days:
         await extend_premium(s, user_id, promo.premium_days, now)
     return promo
@@ -219,8 +178,9 @@ class Stats:
     active_week: int
     premium_active: int
     blocked: int
-    chat_today: int
-    images_today: int
+    cards_total: int
+    cards_today: int
+    battles_today: int
     payments_today: int
     stars_today: int
     rub_today: int
@@ -248,12 +208,11 @@ async def collect_stats(s: AsyncSession, tz: ZoneInfo) -> Stats:
         active_week=await count(users.where(User.last_seen_at >= week_start)),
         premium_active=await count(users.where(User.premium_until > now)),
         blocked=await count(users.where(User.is_blocked.is_(True))),
-        chat_today=await count(
-            select(func.count()).select_from(Usage).where(Usage.created_at >= day_start, Usage.kind == "chat")
+        cards_total=await count(select(func.count(Card.id)).where(Card.status == "active")),
+        cards_today=await count(
+            select(func.count(Card.id)).where(Card.status == "active", Card.created_at >= day_start)
         ),
-        images_today=await count(
-            select(func.count()).select_from(Usage).where(Usage.created_at >= day_start, Usage.kind == "image")
-        ),
+        battles_today=await count(select(func.count(Battle.id)).where(Battle.created_at >= day_start)),
         payments_today=await count(
             select(func.count()).select_from(Payment).where(ok_payments, Payment.paid_at >= day_start)
         ),
@@ -310,10 +269,6 @@ async def source_stats(s: AsyncSession, limit: int = 30) -> list[SourceRow]:
         payers, stars, rub = payments.get(src, (0, 0, 0))
         result.append(SourceRow(src, int(users_count), int(payers), int(stars), int(rub)))
     return result
-
-
-async def prune_usage(s: AsyncSession, days: int = 90) -> None:
-    await s.execute(delete(Usage).where(Usage.created_at < utcnow() - timedelta(days=days)))
 
 
 async def user_payments_summary(s: AsyncSession, user_id: int) -> tuple[int, int, int]:

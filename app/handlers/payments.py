@@ -24,13 +24,13 @@ async def _show_shop(message: Message, ctx: Services) -> None:
     await message.answer(texts.shop(ctx.settings, methods), reply_markup=kb.shop_kb(methods))
 
 
-@router.message(Command("buy", "premium_shop"))
-@router.message(F.text == kb.BTN_BUY)
+@router.message(Command("buy", "shop"))
+@router.message(F.text == kb.BTN_SHOP)
 async def menu_buy(message: Message, ctx: Services) -> None:
     await _show_shop(message, ctx)
 
 
-@router.callback_query(kb.MenuCb.filter(F.action == "buy"))
+@router.callback_query(kb.MenuCb.filter(F.action == "shop"))
 async def cb_buy(callback: CallbackQuery, ctx: Services) -> None:
     await callback.answer()
     await _show_shop(callback.message, ctx)  # type: ignore[arg-type]

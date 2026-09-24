@@ -16,6 +16,7 @@ from aiogram.methods import (
     EditMessageText,
     GetChatMember,
     GetMe,
+    SendPhoto,
     TelegramMethod,
 )
 from aiogram.types import (
@@ -23,8 +24,10 @@ from aiogram.types import (
     Chat,
     ChatMemberLeft,
     ChatMemberMember,
+    InlineQuery,
     Message,
     MessageId,
+    PhotoSize,
     PreCheckoutQuery,
     SuccessfulPayment,
     Update,
@@ -68,11 +71,16 @@ class FakeSession(BaseSession):
             return True
         if method.__returning__ is Message:
             chat_id = getattr(method, "chat_id", 0)
+            photo = None
+            if isinstance(method, SendPhoto):
+                n = next(self._ids)
+                photo = [PhotoSize(file_id=f"photo_{n}", file_unique_id=f"u{n}", width=768, height=1075)]
             return Message(
                 message_id=next(self._ids),
                 date=datetime.now(UTC),
                 chat=Chat(id=chat_id if isinstance(chat_id, int) else -1, type="private"),
                 text=getattr(method, "text", None),
+                photo=photo,
             ).as_(bot)
         raise NotImplementedError(f"FakeSession: unsupported method {type(method).__name__}")
 
@@ -97,11 +105,19 @@ _update_ids = itertools.count(1)
 _message_ids = itertools.count(1)
 
 
-def tg_user(user_id: int, name: str = "Иван", username: str | None = None) -> User:
-    return User(id=user_id, is_bot=False, first_name=name, username=username, language_code="ru")
+_names: dict[int, str] = {}
 
 
-def message_update(text: str | None, user_id: int = 100, name: str = "Иван", chat_type: str = "private", **extra: Any) -> Update:
+def tg_user(user_id: int, name: str | None = None, username: str | None = None) -> User:
+    """A Telegram user; the name is remembered so that later updates from them don't "rename" the player."""
+    if name is not None:
+        _names[user_id] = name
+    return User(id=user_id, is_bot=False, first_name=_names.get(user_id, "Иван"), username=username, language_code="ru")
+
+
+def message_update(
+    text: str | None, user_id: int = 100, name: str | None = None, chat_type: str = "private", **extra: Any
+) -> Update:
     chat_id = user_id if chat_type == "private" else -5000
     msg = Message(
         message_id=next(_message_ids),
@@ -149,3 +165,8 @@ def payment_update(
         **extra,
     )
     return message_update(None, user_id=user_id, successful_payment=sp)
+
+
+def inline_update(query: str, user_id: int = 100) -> Update:
+    iq = InlineQuery(id=str(next(_update_ids)), from_user=tg_user(user_id), query=query, offset="")
+    return Update(update_id=next(_update_ids), inline_query=iq)

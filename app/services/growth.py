@@ -1,24 +1,18 @@
-"""Growth mechanics: referrals, traffic source tags, broadcasts, showcase channel autoposting."""
+"""Growth mechanics: referrals, traffic source tags, broadcasts, the "World of Words Chronicle" channel."""
 
 from __future__ import annotations
 
 import asyncio
 import logging
-import random
-from dataclasses import dataclass
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 from aiogram import Bot
 from aiogram.exceptions import TelegramAPIError, TelegramForbiddenError, TelegramRetryAfter
-from aiogram.types import BufferedInputFile
+from aiogram.types import InlineKeyboardMarkup
 from sqlalchemy import select, update
 
-from app import keyboards as kb
 from app import texts
 from app.db.models import User
-from app.services.images import build_request
-from app.services.queue import PRIORITY_BACKGROUND
 from app.utils import sanitize_tag
 
 if TYPE_CHECKING:
@@ -33,7 +27,7 @@ async def bot_link(bot: Bot, payload: str = "") -> str:
 
 
 async def apply_start_payload(ctx: Services, user: User, payload: str) -> str | None:
-    """Handle the /start parameter of a new user: ``ref_<id>`` is a referral, anything else is a source tag."""
+    """/start parameter of a new player: ``ref_<id>`` is a referral, ``c_<id>`` is a card link, anything else is a source tag."""
     settings = ctx.settings
     if payload.startswith("ref_"):
         ref = payload[4:]
@@ -49,14 +43,17 @@ async def apply_start_payload(ctx: Services, user: User, payload: str) -> str | 
                 .values(
                     referrer_id=referrer_id,
                     source="ref",
-                    credits=User.credits + settings.ref_bonus_invitee,
+                    crystals=User.crystals + settings.ref_bonus_invitee,
                 )
             )
         if result.rowcount != 1 or not settings.ref_bonus_invitee:
             return None
         return texts.referral_welcome(settings.ref_bonus_invitee)
 
-    tag = sanitize_tag(payload[4:] if payload.startswith("src_") else payload)
+    if payload.startswith("c_"):
+        tag = "card"
+    else:
+        tag = sanitize_tag(payload[4:] if payload.startswith("src_") else payload)
     if tag:
         async with ctx.db.begin() as s:
             await s.execute(update(User).where(User.id == user.id, User.source.is_(None)).values(source=tag))
@@ -64,7 +61,7 @@ async def apply_start_payload(ctx: Services, user: User, payload: str) -> str | 
 
 
 async def reward_inviter(bot: Bot, ctx: Services, user: User) -> None:
-    """Pay the inviter once the friend makes their first real request (protection from fake accounts)."""
+    """Pay the inviter once the friend claims their first word (protection from fake accounts)."""
     if not user.referrer_id or user.referral_rewarded:
         return
     bonus = ctx.settings.ref_bonus_inviter
@@ -78,14 +75,36 @@ async def reward_inviter(bot: Bot, ctx: Services, user: User) -> None:
             await s.execute(
                 update(User)
                 .where(User.id == user.referrer_id)
-                .values(credits=User.credits + bonus, ref_earned=User.ref_earned + bonus)
+                .values(crystals=User.crystals + bonus, ref_earned=User.ref_earned + bonus)
             )
     user.referral_rewarded = True
     if bonus:
-        try:
-            await bot.send_message(user.referrer_id, texts.referral_reward(bonus, user.first_name or "Друг"))
-        except TelegramAPIError:
-            pass
+        await notify(bot, user.referrer_id, texts.referral_reward(bonus, user.first_name or "Друг"))
+
+
+async def notify(bot: Bot, chat_id: int, text: str, reply_markup: InlineKeyboardMarkup | None = None) -> bool:
+    try:
+        await bot.send_message(chat_id, text, reply_markup=reply_markup)
+        return True
+    except TelegramAPIError as e:
+        log.info("Can't notify %s: %s", chat_id, e)
+        return False
+
+
+async def announce(
+    bot: Bot, ctx: Services, text: str, photo: str | None = None, reply_markup: InlineKeyboardMarkup | None = None
+) -> None:
+    """Post to the "Chronicle of the World of Words" channel (if configured)."""
+    channel = ctx.settings.news_channel
+    if not channel:
+        return
+    try:
+        if photo:
+            await bot.send_photo(channel, photo, caption=text, reply_markup=reply_markup)
+        else:
+            await bot.send_message(channel, text, reply_markup=reply_markup)
+    except TelegramAPIError as e:
+        log.warning("News channel post failed: %s", e)
 
 
 async def run_broadcast(bot: Bot, ctx: Services, admin_chat: int, from_chat: int, message_id: int) -> None:
@@ -125,57 +144,3 @@ async def run_broadcast(bot: Bot, ctx: Services, admin_chat: int, from_chat: int
         admin_chat,
         f"📬 Рассылка завершена.\n✅ Доставлено: {sent}\n🚫 Заблокировали бота: {blocked}\n⚠️ Ошибки: {failed}",
     )
-
-
-@dataclass(frozen=True)
-class ShowcaseItem:
-    caption: str
-    prompt: str
-    style: str
-
-
-def load_showcase_items(path: str) -> list[ShowcaseItem]:
-    """Line format: ``Russian caption | English prompt | style``."""
-    file = Path(path)
-    if not file.exists():
-        return []
-    items = []
-    for line in file.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if not line or line.startswith("#"):
-            continue
-        parts = [p.strip() for p in line.split("|")]
-        if len(parts) < 2:
-            continue
-        items.append(ShowcaseItem(parts[0], parts[1], parts[2] if len(parts) > 2 else "auto"))
-    return items
-
-
-async def post_showcase(bot: Bot, ctx: Services) -> bool:
-    settings = ctx.settings
-    items = load_showcase_items(settings.showcase_prompts_file)
-    if not settings.showcase_channel or not items:
-        return False
-    item = random.choice(items)
-    req = build_request(settings, item.prompt, item.style, "1x1")
-    image = await ctx.gen.submit(lambda: ctx.images.generate(req), priority=PRIORITY_BACKGROUND)
-    link = await bot_link(bot, "src_showcase")
-    await bot.send_photo(
-        chat_id=settings.showcase_channel,
-        photo=BufferedInputFile(image, "art.png"),
-        caption=texts.showcase_caption(item.caption, settings.bot_name),
-        reply_markup=kb.url_kb("🎨 Создать свою картинку", link),
-    )
-    return True
-
-
-async def showcase_loop(bot: Bot, ctx: Services) -> None:
-    interval = max(ctx.settings.showcase_interval_minutes, 10) * 60
-    while True:
-        await asyncio.sleep(interval)
-        try:
-            await post_showcase(bot, ctx)
-        except asyncio.CancelledError:
-            raise
-        except Exception:
-            log.exception("Showcase post failed")

@@ -8,7 +8,6 @@ services:
     env_file: .env
     volumes:
       - ./data:/app/data
-      - ./promo:/app/promo:ro
       - ./workflows:/app/workflows:ro
     extra_hosts:
       # доступ к Ollama/ComfyUI, запущенным на этой же машине: http://host.docker.internal:11434

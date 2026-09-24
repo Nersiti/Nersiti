@@ -11,13 +11,15 @@ from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.types import Update
+from sqlalchemy import select
 
 from app.config import Settings
 from app.context import Services
 from app.db import repo
-from app.db.models import Base, User
-from app.handlers import admin, ai, bonus, common, menu, payments
+from app.db.models import Base, Card, User
+from app.handlers import ALL_ROUTERS
 from app.main import build_dispatcher, build_services, shutdown, startup
+from tests import fake
 from tests.fake import FakeSession
 
 ADMIN_ID = 1
@@ -30,9 +32,8 @@ def make_settings(tmp_path: Path, **overrides: Any) -> Settings:
         "database_url": os.environ.get("TEST_DATABASE_URL") or f"sqlite+aiosqlite:///{tmp_path}/test.db",
         "llm_backend": "mock",
         "image_backend": "mock",
-        "image_translate": False,
-        "llm_stream": False,
         "admin_ids": [ADMIN_ID],
+        "auction_enabled": False,
         "throttle_seconds": 0,
         "support_contact": "@support",
     }
@@ -50,6 +51,12 @@ class BotHarness:
     async def feed(self, update: Update) -> None:
         await self.dp.feed_update(self.bot, update)
 
+    async def card(self, word: str) -> Card:
+        async with self.ctx.db.session() as s:
+            card = await s.scalar(select(Card).where(Card.word == word))
+        assert card is not None
+        return card
+
     async def user(self, user_id: int) -> User:
         async with self.ctx.db.session() as s:
             user = await repo.get_user(s, user_id)
@@ -61,10 +68,12 @@ class BotHarness:
 async def harness_factory(tmp_path: Path) -> AsyncIterator[Callable[..., Any]]:
     created: list[BotHarness] = []
 
+    fake._names.clear()
+
     async def factory(**overrides: Any) -> BotHarness:
         # роутеры — модульные синглтоны; в тестах собираем новый диспетчер, поэтому отвязываем их
-        for module in (admin, ai, bonus, common, menu, payments):
-            module.router._parent_router = None
+        for router in ALL_ROUTERS:
+            router._parent_router = None
         ctx = build_services(make_settings(tmp_path, **overrides))
         if not ctx.db.is_sqlite:
             async with ctx.db.engine.begin() as conn:
@@ -72,7 +81,7 @@ async def harness_factory(tmp_path: Path) -> AsyncIterator[Callable[..., Any]]:
         session = FakeSession()
         bot = Bot("42:TEST", session=session, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
         dp = build_dispatcher(ctx)
-        await startup(bot, ctx, configure_bot=False)
+        await startup(bot, ctx, configure_bot=False, background=False)
         harness = BotHarness(bot, dp, ctx, session)
         created.append(harness)
         return harness

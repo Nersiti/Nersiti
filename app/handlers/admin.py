@@ -16,11 +16,13 @@ from app import keyboards as kb
 from app import texts
 from app.context import Services
 from app.db import repo
-from app.db.models import User
+from app.db.models import Card, User
+from app.game.service import GameError
+from app.game.words import display_form, normalize
 from app.services.channels import parse_channels
-from app.services.growth import bot_link, post_showcase, run_broadcast
+from app.services.growth import announce, bot_link, run_broadcast
 from app.services.kv import AD_TEXT, REQUIRED_CHANNELS
-from app.utils import credits_word, esc, fmt_dt, sanitize_tag, utcnow
+from app.utils import esc, fmt_dt, sanitize_tag, utcnow
 
 log = logging.getLogger(__name__)
 
@@ -88,7 +90,8 @@ async def cmd_user(message: Message, command: CommandObject, ctx: Services) -> N
     async with ctx.db.session() as s:
         referrals = await repo.count_referrals(s, target.id)
         payments = await repo.user_payments_summary(s, target.id)
-    await message.answer(texts.admin_user(target, ctx.settings, referrals, payments))
+    _, cards, _ = await ctx.game.user_cards(target.id, 0, 1)
+    await message.answer(texts.admin_user(target, ctx.settings, referrals, payments, cards))
 
 
 @router.message(Command("give"))
@@ -103,11 +106,11 @@ async def cmd_give(message: Message, command: CommandObject, ctx: Services, bot:
         return
     amount = int(args[1])
     async with ctx.db.begin() as s:
-        await repo.add_credits(s, target.id, amount)
-    await message.answer(f"✅ {target.id}: {'+' if amount > 0 else ''}{amount} кредитов")
+        await repo.add_crystals(s, target.id, amount)
+    await message.answer(f"✅ {target.id}: {'+' if amount > 0 else ''}{amount} 💎")
     if amount > 0:
         try:
-            await bot.send_message(target.id, f"🎁 Тебе начислено <b>{credits_word(amount)}</b>!")
+            await bot.send_message(target.id, f"🎁 Тебе начислено <b>{amount} 💎</b>!")
         except TelegramAPIError:
             pass
 
@@ -124,9 +127,9 @@ async def cmd_premium(message: Message, command: CommandObject, ctx: Services, b
         return
     async with ctx.db.begin() as s:
         until = await repo.extend_premium(s, target.id, int(args[1]), utcnow())
-    await message.answer(f"✅ Premium для {target.id} до {fmt_dt(until, ctx.settings.tz)}")
+    await message.answer(f"✅ Лорд {target.id} до {fmt_dt(until, ctx.settings.tz)}")
     try:
-        await bot.send_message(target.id, f"💎 Тебе подарен Premium до <b>{fmt_dt(until, ctx.settings.tz)}</b>!")
+        await bot.send_message(target.id, f"👑 Тебе подарен статус Лорда до <b>{fmt_dt(until, ctx.settings.tz)}</b>!")
     except TelegramAPIError:
         pass
 
@@ -150,24 +153,24 @@ async def cmd_ban(message: Message, command: CommandObject, ctx: Services) -> No
 @router.message(Command("promo_new"))
 async def cmd_promo_new(message: Message, command: CommandObject, ctx: Services) -> None:
     args = _args(command)
-    usage = "Использование: <code>/promo_new КОД кредиты [активаций=100] [дней_premium=0] [дней_жизни=0]</code>"
+    usage = "Использование: <code>/promo_new КОД кристаллы [активаций=100] [дней_лорда=0] [дней_жизни=0]</code>"
     if len(args) < 2 or not all(a.isdigit() for a in args[1:5]):
         await message.answer(usage)
         return
     code = sanitize_tag(args[0]).upper()
-    credits = int(args[1])
+    crystals = int(args[1])
     max_uses = int(args[2]) if len(args) > 2 else 100
     premium_days = int(args[3]) if len(args) > 3 else 0
     lifetime = int(args[4]) if len(args) > 4 else 0
     expires = utcnow() + timedelta(days=lifetime) if lifetime else None
     try:
         async with ctx.db.begin() as s:
-            await repo.create_promo(s, code, credits, max_uses, premium_days, expires)
+            await repo.create_promo(s, code, crystals, max_uses, premium_days, expires)
     except IntegrityError:
         await message.answer("Такой промокод уже существует.")
         return
     await message.answer(
-        f"✅ Промокод <code>{code}</code>: {credits} кредитов, Premium {premium_days} дн., "
+        f"✅ Промокод <code>{code}</code>: {crystals} 💎, Лорд {premium_days} дн., "
         f"активаций {max_uses or '∞'}, до {fmt_dt(expires, ctx.settings.tz)}"
     )
 
@@ -180,7 +183,7 @@ async def cmd_promos(message: Message, ctx: Services) -> None:
         await message.answer("Промокодов пока нет. Создать: /promo_new")
         return
     lines = [
-        f"<code>{p.code}</code> — {p.credits} кр., {p.premium_days} дн. · {p.used}/{p.max_uses or '∞'}"
+        f"<code>{p.code}</code> — {p.crystals} 💎, {p.premium_days} дн. · {p.used}/{p.max_uses or '∞'}"
         for p in promos
     ]
     await message.answer("🎟 <b>Промокоды</b>\n\n" + "\n".join(lines))
@@ -272,19 +275,37 @@ async def cmd_channels(message: Message, command: CommandObject, ctx: Services) 
     )
 
 
-@router.message(Command("showcase"))
-async def cmd_showcase(message: Message, ctx: Services, bot: Bot) -> None:
-    if not ctx.settings.showcase_channel:
-        await message.answer("Канал-витрина не настроен (SHOWCASE_CHANNEL в .env).")
+@router.message(Command("delcard"))
+async def cmd_delcard(message: Message, command: CommandObject, ctx: Services) -> None:
+    word = normalize(command.args or "")
+    if not word:
+        await message.answer("Использование: <code>/delcard слово</code>")
         return
+    async with ctx.db.begin() as s:
+        card = await s.scalar(select(Card).where(Card.word == word))
+        if card is None:
+            await message.answer("Такого слова нет.")
+            return
+        await s.delete(card)
+    await message.answer(f"🗑 Карта «{esc(card.display)}» удалена, слово снова свободно.")
 
-    async def job() -> None:
-        try:
-            ok = await post_showcase(bot, ctx)
-            await bot.send_message(message.chat.id, "✅ Пост опубликован." if ok else "Нет промптов для витрины.")
-        except Exception as e:  # noqa: BLE001
-            log.exception("Showcase failed")
-            await bot.send_message(message.chat.id, f"❌ Ошибка: {esc(repr(e))[:500]}")
 
-    _spawn(ctx, job(), "showcase-now")
-    await message.answer("🎨 Генерирую пост для витрины…")
+@router.message(Command("auction_start"))
+async def cmd_auction_start(message: Message, command: CommandObject, ctx: Services, bot: Bot) -> None:
+    args = (command.args or "").rsplit(maxsplit=1)
+    hours = 6
+    if len(args) == 2 and args[1].isdigit():
+        raw, hours = args[0], int(args[1])
+    else:
+        raw = command.args or ""
+    word = normalize(raw)
+    if not word:
+        await message.answer("Использование: <code>/auction_start слово [часов=6]</code>")
+        return
+    try:
+        auction = await ctx.auctions.start(word, utcnow() + timedelta(hours=hours), display_form(raw))
+    except GameError as e:
+        await message.answer(texts.error_text(e, ctx.settings))
+        return
+    await message.answer(f"🔨 Аукцион «{esc(auction.display)}» запущен до {fmt_dt(auction.ends_at, ctx.settings.tz)}.")
+    await announce(bot, ctx, texts.news_auction_start(auction, ctx.settings))

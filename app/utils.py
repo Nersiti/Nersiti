@@ -47,17 +47,6 @@ def plural(n: int, one: str, few: str, many: str) -> str:
     return many
 
 
-def credits_word(n: int) -> str:
-    return f"{n} {plural(n, 'кредит', 'кредита', 'кредитов')}"
-
-
-_CYRILLIC = re.compile(r"[а-яё]", re.IGNORECASE)
-
-
-def has_cyrillic(text: str) -> bool:
-    return bool(_CYRILLIC.search(text))
-
-
 _TAG_RE = re.compile(r"[^a-zA-Z0-9_-]")
 
 

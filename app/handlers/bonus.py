@@ -50,7 +50,7 @@ async def cb_daily(callback: CallbackQuery, user: User, ctx: Services) -> None:
         result = await s.execute(
             update(User)
             .where(User.id == user.id, or_(User.bonus_date.is_(None), User.bonus_date != today))
-            .values(bonus_date=today, credits=User.credits + amount)
+            .values(bonus_date=today, crystals=User.crystals + amount)
         )
     if result.rowcount != 1 or amount <= 0:
         await callback.answer(texts.DAILY_ALREADY, show_alert=True)
@@ -73,4 +73,4 @@ async def cmd_promo(message: Message, command: CommandObject, user: User, ctx: S
     if isinstance(result, str):
         await message.answer(texts.PROMO_ERRORS.get(result, texts.PROMO_ERRORS["not_found"]))
         return
-    await message.answer(texts.promo_ok(result.credits, result.premium_days))
+    await message.answer(texts.promo_ok(result.crystals, result.premium_days))

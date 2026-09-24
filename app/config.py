@@ -7,17 +7,9 @@ from zoneinfo import ZoneInfo
 from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
-DEFAULT_SYSTEM_PROMPT = (
-    "Ты — {bot_name}, умный и дружелюбный ИИ-ассистент в Telegram. "
-    "Отвечай на языке пользователя (по умолчанию — на русском). "
-    "Пиши ясно и по делу, структурируй ответ: короткие абзацы, списки, блоки кода. "
-    "Используй Markdown (**жирный**, списки, ```код```). "
-    "Не выдумывай факты: если не уверен — так и скажи."
-)
-
 DEFAULT_NEGATIVE = (
-    "nsfw, nude, naked, lowres, bad anatomy, bad hands, extra fingers, missing fingers, "
-    "deformed, blurry, jpeg artifacts, watermark, signature, text, logo, worst quality, low quality"
+    "text, letters, words, watermark, signature, logo, frame, border, nsfw, nude, lowres, blurry, "
+    "bad anatomy, deformed, extra limbs, worst quality, low quality, jpeg artifacts"
 )
 
 
@@ -28,67 +20,75 @@ def _csv(value: Any) -> Any:
 
 
 class Settings(BaseSettings):
-    """All bot settings. Values come from environment variables or the .env file."""
+    """All settings come from environment variables or the .env file."""
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     # --- Telegram ---
     bot_token: SecretStr
     admin_ids: Annotated[list[int], NoDecode] = Field(default_factory=list)
-    bot_name: str = "Nersiti AI"
-    support_contact: str = ""  # @username для /paysupport
+    bot_name: str = "Хозяин Слова"
+    support_contact: str = ""
     database_url: str = "sqlite+aiosqlite:///data/bot.db"
     timezone: str = "Europe/Moscow"
     log_level: str = "INFO"
-    throttle_seconds: float = 0.7
+    throttle_seconds: float = 0.5
 
-    # --- Текстовая нейросеть (любой OpenAI-совместимый API: Ollama, DeepSeek, OpenRouter, VseGPT...) ---
+    # --- Текстовая нейросеть (любой OpenAI-совместимый API) ---
     llm_backend: Literal["openai", "mock"] = "openai"
     llm_base_url: str = "http://localhost:11434/v1"
     llm_api_key: SecretStr = SecretStr("ollama")
     llm_model: str = "qwen2.5:7b"
-    llm_system_prompt: str = DEFAULT_SYSTEM_PROMPT
-    llm_temperature: float = 0.7
-    llm_max_tokens: int = 1500
-    llm_timeout: float = 180.0
+    llm_timeout: float = 90.0
     llm_concurrency: int = 4
-    llm_stream: bool = True
-    history_free: int = 6
-    history_premium: int = 20
 
-    # --- Генерация картинок ---
+    # --- Картинки для карт ---
     image_backend: Literal["comfyui", "a1111", "openai", "mock"] = "comfyui"
     image_api_url: str = "http://localhost:8188"
     image_api_key: SecretStr = SecretStr("")
     image_model: str = "sd_xl_base_1.0.safetensors"
     comfy_workflow: str = "workflows/sdxl.json"
-    image_steps: int = 28
+    image_steps: int = 26
     image_cfg: float = 6.0
     image_sampler: str = "DPM++ 2M Karras"
     image_size_scale: float = 1.0
     image_negative: str = DEFAULT_NEGATIVE
-    image_translate: bool = True
     image_workers: int = 1
     image_timeout: float = 300.0
 
-    # --- Экономика ---
-    free_chat_per_day: int = 15
-    free_images_per_day: int = 3
-    premium_chat_per_day: int = 500
-    premium_images_per_day: int = 60
-    chat_cost: int = 1
-    image_cost: int = 5
-    start_bonus: int = 10
-    ref_bonus_inviter: int = 15
-    ref_bonus_invitee: int = 10
+    # --- Экономика игры (в кристаллах 💎) ---
+    start_crystals: int = 30
+    free_quills_per_day: int = 3  # сколько слов в день можно захватить бесплатно
+    lord_quills_per_day: int = 10
+    quill_price: int = 15  # перо сверх лимита
+    free_battles_per_day: int = 5
+    lord_battles_per_day: int = 30
+    battle_price: int = 3
+    daily_bonus: int = 5
+    immunity_hours: int = 48  # защита слова после захвата
+    shield_days: int = 3
+    shield_percent: int = 25  # цена щита — % от ценности слова
+    fee_percent: int = 10  # комиссия игры с продаж и захватов (сжигается)
+    lord_fee_percent: int = 5
+    offer_ttl_hours: int = 24
+    lord_bonus_crystals: int = 100  # бонус при каждой оплате «Лорда»
+    ref_bonus_inviter: int = 30
+    ref_bonus_invitee: int = 15
     ref_percent: int = 10
-    daily_bonus: int = 3
-    ad_every: int = 5
+    ad_every: int = 4  # реклама бесплатным игрокам каждые N боёв (0 — выключить)
+
+    # --- Аукцион «горячих» слов ---
+    auction_enabled: bool = True
+    auction_start_hour: int = 12
+    auction_end_hour: int = 21
+    auction_min_bid: int = 50
+    auction_step_percent: int = 10
+    auction_snipe_minutes: int = 5
 
     # --- Оплата ---
     stars_enabled: bool = True
-    rub_provider_token: SecretStr = SecretStr("")  # платёжный токен из @BotFather (ЮKassa, Robokassa и т.п.)
-    rub_receipt: bool = False  # передавать данные чека (54-ФЗ) провайдеру
+    rub_provider_token: SecretStr = SecretStr("")
+    rub_receipt: bool = False
     rub_vat_code: int = 1
     yookassa_shop_id: str = ""
     yookassa_secret_key: SecretStr = SecretStr("")
@@ -97,9 +97,7 @@ class Settings(BaseSettings):
 
     # --- Продвижение ---
     required_channels: Annotated[list[str], NoDecode] = Field(default_factory=list)
-    showcase_channel: str = ""
-    showcase_interval_minutes: int = 180
-    showcase_prompts_file: str = "promo/showcase_prompts.txt"
+    news_channel: str = ""  # канал «Хроника мира слов»: легендарные карты, захваты, аукционы
 
     @field_validator("admin_ids", "required_channels", mode="before")
     @classmethod
@@ -117,10 +115,6 @@ class Settings(BaseSettings):
     @property
     def yookassa_enabled(self) -> bool:
         return bool(self.yookassa_shop_id and self.yookassa_secret_key.get_secret_value())
-
-    @property
-    def system_prompt(self) -> str:
-        return self.llm_system_prompt.replace("{bot_name}", self.bot_name)
 
     def is_admin(self, user_id: int) -> bool:
         return user_id in self.admin_ids

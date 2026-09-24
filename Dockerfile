@@ -12,7 +12,7 @@ RUN pip install -r requirements.txt
 
 COPY app ./app
 COPY workflows ./workflows
-COPY promo ./promo
+COPY assets ./assets
 
 VOLUME ["/app/data"]
 CMD ["python", "-m", "app"]
