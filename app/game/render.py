@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import io
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from functools import lru_cache
 from pathlib import Path
 
@@ -49,6 +49,19 @@ def font(kind: str, size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
     except OSError:
         log.warning("Font %s not found, using default", files[kind])
         return ImageFont.load_default(size)
+
+
+# Emoji and pictographic symbols: DejaVu can't render them, and Pillow would draw boxes in their place.
+_EMOJI_RANGES = ((0x2300, 0x23FF), (0x2600, 0x27BF), (0x2B00, 0x2BFF), (0xFE00, 0xFE0F), (0x1F000, 0x10FFFF))
+
+
+def _drawable(text: str) -> str:
+    cleaned = "".join(
+        ch
+        for ch in text
+        if ch not in "\u200d\u20e3" and not any(lo <= ord(ch) <= hi for lo, hi in _EMOJI_RANGES)
+    )
+    return " ".join(cleaned.split())
 
 
 def _fit_font(draw: ImageDraw.ImageDraw, text: str, kind: str, size: int, max_width: int, min_size: int = 18):
@@ -104,6 +117,8 @@ def _rainbow_overlay(size: tuple[int, int]) -> Image.Image:
 
 
 def render_card(view: CardView, art: bytes | None) -> bytes:
+    view = replace(view, **{k: _drawable(getattr(view, k)) for k in ("word", "name", "title", "ability", "ability_text")})
+    view = replace(view, creator=_drawable(view.creator) or "Игрок")
     rarity = RARITIES[view.rarity]
     element = ELEMENTS[view.element]
     img = Image.new("RGB", (W, H), BG)
@@ -167,7 +182,7 @@ def render_card(view: CardView, art: bytes | None) -> bytes:
         draw.text((x0 + 112, 975), str(value), font=font("serif", 34), fill=color, anchor="mm")
 
     # подвал
-    footer = f"Открыл: {view.creator}"
+    footer = f"Первооткрыватель: {view.creator}"
     if view.bot_username:
         footer += f"   ·   @{view.bot_username}"
     draw.text((W // 2, 1030), footer, font=_fit_font(draw, footer, "regular", 20, W - 80, 14), fill=MUTED, anchor="mm")

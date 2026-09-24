@@ -51,3 +51,5 @@ class Services:
     busy: set[int] = field(default_factory=set)
     tasks: list[asyncio.Task[None]] = field(default_factory=list)
     pending_broadcasts: dict[int, tuple[int, int]] = field(default_factory=dict)
+    reported: set[tuple[int, int]] = field(default_factory=set)  # (игрок, карта) — одна жалоба на карту
+    next_reminders_at: float = 0.0

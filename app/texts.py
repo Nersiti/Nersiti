@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
 
 from app.config import Settings
@@ -30,6 +30,11 @@ def words_word(n: int) -> str:
 
 
 def welcome(name: str, s: Settings, world: int) -> str:
+    world_line = (
+        f"🌍 Уже занято слов: <b>{world}</b>. Остальные ждут хозяина."
+        if world >= 50
+        else "🌍 Мир только открылся — самые вкусные слова ещё свободны!"
+    )
     return (
         f"👋 {esc(name)}, добро пожаловать в <b>{esc(s.bot_name)}</b>!\n\n"
         "Здесь можно <b>завладеть любым словом мира</b>. Навсегда.\n\n"
@@ -37,7 +42,7 @@ def welcome(name: str, s: Settings, world: int) -> str:
         "в уникальное существо и нарисует карту.\n"
         "⚔️ Сражайся картами, захватывай чужие слова, выкупай их и защищай свои.\n"
         "🔨 Каждый день — аукцион легендарного слова.\n\n"
-        f"🌍 Уже занято слов: <b>{world}</b>. Остальные ждут хозяина.\n\n"
+        f"{world_line}\n\n"
         f"🎁 Держи {cr(s.start_crystals)} на старт. Каждый день — {s.free_quills_per_day} бесплатных пера.\n\n"
         "👇 <b>Напиши любое слово прямо сейчас.</b> Например: <i>бывший</i>, <i>пробка</i>, <i>Wi-Fi в метро</i>"
     )
@@ -58,6 +63,8 @@ def rules_text(s: Settings) -> str:
         f"После захвата у слова {s.immunity_hours} ч иммунитета. Щит защищает ещё на {s.shield_days} дня.\n\n"
         "<b>💰 Выкуп.</b> Предложи владельцу цену — кристаллы замораживаются, пока он решает. "
         f"Комиссия игры {s.fee_percent}% (для Лордов {s.lord_fee_percent}%).\n\n"
+        "<b>🛡 Последнее слово</b> игрока захватить нельзя — никто не останется ни с чем.\n\n"
+        "<b>🏅 Турнир недели.</b> Победы в боях приносят очки, по понедельникам лучшие получают кристаллы.\n\n"
         "<b>🔨 Аукцион.</b> Самые «горячие» слова (любовь, деньги, пятница…) нельзя захватить — "
         "они разыгрываются на аукционе по одному в день. Победитель получает легендарную или мифическую карту.\n\n"
         f"<b>👑 Лорд</b> — {s.lord_quills_per_day} перьев и {s.lord_battles_per_day} боёв в день, "
@@ -78,7 +85,9 @@ def terms(s: Settings) -> str:
         "4. Возврат: если услуга не оказана из-за технического сбоя, напишите в /paysupport в течение 14 дней.\n"
         "5. Запрещено создавать слова с оскорблениями, политикой, именами реальных людей, контентом 18+. "
         "Такие карты удаляются, за нарушения доступ ограничивается без возврата средств.\n"
-        "6. Мы храним ваш Telegram ID и имя для работы игры. Ваше имя видно другим игрокам в топе и на картах.\n"
+        "6. Мы храним ваш Telegram ID и имя для работы игры. Ваше имя видно другим игрокам в топе и на картах. "
+        "Бот присылает игровые уведомления (атаки на ваши слова, аукционы, итоги турнира) и не чаще раза в неделю — "
+        "напоминание, если вы давно не заходили.\n"
         "7. Условия могут обновляться, актуальная версия — по команде /terms."
     )
 
@@ -127,7 +136,7 @@ def word_reserved(display: str, on_auction: bool, s: Settings) -> str:
 
 
 def word_creating(display: str) -> str:
-    return f"⏳ Слово «{esc(display)}» прямо сейчас захватывает другой игрок. Опоздал на секунды!"
+    return f"⏳ Слово «{esc(display)}» прямо сейчас захватывает другой игрок. Опоздание на секунды!"
 
 
 def creating(display: str, load: int) -> str:
@@ -191,13 +200,14 @@ def no_crystals(need: int) -> str:
 ERRORS = {
     "taken": "😱 Кто-то оказался быстрее и уже захватил это слово! Посмотри, кто владелец, и отбери его в бою.",
     "mine": "Это слово уже твоё 🙂",
+    "last_word": "🛡 Это последнее слово игрока — его нельзя захватить, только сразиться просто так.",
     "reserved": "🔥 Это слово разыгрывается только на аукционе.",
     "not_found": "Карта не найдена.",
     "not_owner": "Это не твоя карта.",
     "own_card": "Это твоя собственная карта 🙂",
     "changed": "Слово только что сменило владельца или получило щит. Попробуй ещё раз.",
     "gpu_offline": "🎨 Художник сейчас отдыхает (видеокарта недоступна). Попробуй позже — кристаллы возвращены.",
-    "offer_exists": "Ты уже сделал предложение за эту карту. Дождись ответа владельца.",
+    "offer_exists": "Предложение за эту карту уже отправлено. Дождись ответа владельца.",
     "offer_gone": "Это предложение уже неактуально.",
     "bad_price": "Некорректная цена.",
     "auction_closed": "Аукцион уже закончился.",
@@ -223,6 +233,24 @@ def error_text(err: GameError, s: Settings) -> str:
 
 
 FORBIDDEN_WORD = "🙅 Такое слово захватить нельзя: оно нарушает правила игры."
+FIRST_CARD_TIPS = (
+    "🎓 <b>Первое слово — твоё!</b> Что дальше:\n\n"
+    "⚔️ <b>Арена</b> — сразись с картами других игроков, карта растёт в уровне и дорожает.\n"
+    "🏴 <b>Захват</b> — отбери понравившееся слово, поставив его ценность.\n"
+    "🛡 <b>Щит</b> — защити свои слова, когда закончится иммунитет.\n"
+    "📤 <b>Похвастайся</b> — в любом чате набери @имя_бота и своё слово.\n\n"
+    "Каждый день — 3 бесплатных пера. Пиши новые слова, пока их не заняли другие!"
+)
+REPORT_SENT = "🚩 Жалоба отправлена модераторам. Спасибо!"
+REPORT_DUPLICATE = "Жалоба на эту карту уже отправлена."
+
+
+def report_admin(card: Card, reporter: str) -> str:
+    return (
+        f"🚩 <b>Жалоба на карту</b> №{card.id} «{esc(card.display)}»\n"
+        f"Существо: {esc(card.name)} — {esc(card.ability_text)}\n"
+        f"Владелец: <code>{card.owner_id}</code> · пожаловался: {esc(reporter)}"
+    )
 CREATE_FAILED = "😔 Не получилось создать карту. Перо возвращено — попробуй ещё раз через минуту."
 
 
@@ -308,6 +336,48 @@ def defender_notice(o: BattleOutcome, attacker_name: str) -> str:
     )
 
 
+def revenge_ready(card: Card) -> str:
+    return (
+        f"⏰ <b>Иммунитет слова «{esc(card.display)}» закончился!</b>\n"
+        "Его у тебя отобрали — самое время вернуть своё. Ставка за захват: "
+        f"{cr(card.value)}."
+    )
+
+
+LORD_EXPIRED = (
+    "👑 Статус Лорда закончился.\n\n"
+    "Снова только 3 пера в день, обычный шанс легендарок и полная комиссия. "
+    "Продлить можно в «💎 Магазин» — с автопродлением и +100 💎 каждый месяц."
+)
+
+
+def reminder(name: str, world: int, owned: int, auction_word: str | None) -> str:
+    lines = [
+        f"👋 {esc(name)}, мир слов не стоит на месте: занято уже <b>{world}</b> {words_word(world)}.",
+        "✒️ Бесплатные перья восстановились — захвати новое слово, пока его не забрали.",
+    ]
+    if owned:
+        lines.append(f"🃏 Твоих слов: {owned}. Проверь, всё ли на месте: /cards")
+    if auction_word:
+        lines.append(f"🔨 Сегодня на аукционе: «{esc(auction_word)}» — /auction")
+    return "\n".join(lines)
+
+
+def tournament_prize(place: int, prize: int, points: int) -> str:
+    medal = {1: "🥇", 2: "🥈", 3: "🥉"}.get(place, "🏅")
+    return f"{medal} <b>{place}-е место в турнире недели!</b> Очков: {points}. Награда: +{cr(prize)}"
+
+
+def news_tournament(winners: list[tuple[str, int, int]]) -> str:
+    medals = ["🥇", "🥈", "🥉"]
+    lines = ["🏆 <b>Итоги турнира недели</b>\n"]
+    for i, (name, points, prize) in enumerate(winners):
+        medal = medals[i] if i < len(medals) else f"{i + 1}."
+        lines.append(f"{medal} {esc(name)} — {points} очков, +{cr(prize)}")
+    lines.append("\nНовый турнир уже начался — очки дают победы в боях.")
+    return "\n".join(lines)
+
+
 def shield_bought(until: datetime, s: Settings) -> str:
     return f"🛡 Щит поднят! Слово защищено от захвата до {fmt_dt(until, s.tz)}."
 
@@ -318,7 +388,8 @@ def shield_bought(until: datetime, s: Settings) -> str:
 def offer_choose(card: Card) -> str:
     return (
         f"💰 <b>Выкуп «{esc(card.display)}»</b>\nЦенность карты: {cr(card.value)}.\n\n"
-        "Сколько предложишь владельцу? Кристаллы заморозятся, пока он решает (до 24 ч)."
+        "Сколько предложишь владельцу? Кристаллы заморозятся, пока он решает (до 24 ч).\n"
+        f"Своя цена: <code>/offer {card.id} 500</code>"
     )
 
 
@@ -355,6 +426,12 @@ OFFER_CANCELED = "Слово сменило владельца — твоё пр
 # ---------- аукцион ----------
 
 
+def duration(delta: timedelta) -> str:
+    minutes = max(0, int(delta.total_seconds() // 60))
+    hours, minutes = divmod(minutes, 60)
+    return f"{hours} ч {minutes} мин" if hours else f"{minutes} мин"
+
+
 def auction_view(a: Auction, top_name: str | None, min_bid: int, s: Settings, is_top: bool) -> str:
     lines = [
         f"🔨 <b>Аукцион: «{esc(a.display)}»</b>",
@@ -362,7 +439,7 @@ def auction_view(a: Auction, top_name: str | None, min_bid: int, s: Settings, is
         "",
         f"💎 Ставка: <b>{a.top_bid or '—'}</b>" + (f" ({esc(top_name)})" if top_name else ""),
         f"📈 Ставок: {a.bids_count}",
-        f"⏰ Окончание: {fmt_dt(a.ends_at, s.tz)}",
+        f"⏰ До конца: {duration(a.ends_at - utcnow())} (в {fmt_dt(a.ends_at, s.tz)})",
         f"Минимальная следующая ставка: {cr(min_bid)}",
     ]
     if is_top:
@@ -398,15 +475,29 @@ def auction_refunded(display: str, price: int) -> str:
 
 
 def auction_won(card: Card, price: int) -> str:
-    return f"🏆 <b>Ты выиграл аукцион!</b> Слово «{esc(card.display)}» твоё за {cr(price)}."
+    return f"🏆 <b>Победа на аукционе!</b> Слово «{esc(card.display)}» твоё за {cr(price)}."
 
 
 # ---------- топ ----------
 
 
-def top(lords: list[tuple[User, int, int]], cards: list[Card], fighters: list[User], world: int) -> str:
+def top(
+    lords: list[tuple[User, int, int]],
+    cards: list[Card],
+    fighters: list[User],
+    world: int,
+    week: list[User] | None = None,
+    prizes: list[int] | None = None,
+) -> str:
     medals = ["🥇", "🥈", "🥉"] + [f"{i}." for i in range(4, 11)]
-    lines = [f"🏆 <b>Топ мира слов</b> · занято слов: {world}\n", "<b>Богатейшие владельцы</b>"]
+    lines = [f"🏆 <b>Топ мира слов</b> · занято слов: {world}\n"]
+    if week:
+        prize_text = f" · призы: {', '.join(cr(p) for p in prizes)}" if prizes else ""
+        lines.append(f"<b>Турнир недели</b>{prize_text}")
+        for i, user in enumerate(week):
+            lines.append(f"{medals[i]} {esc(public_name(user))} — {user.week_points} очков")
+        lines.append("")
+    lines.append("<b>Богатейшие владельцы</b>")
     for i, (user, total, count) in enumerate(lords):
         crown = " 👑" if is_lord(user) else ""
         lines.append(f"{medals[i]} {esc(public_name(user))}{crown} — {total} 💎 ({count} {words_word(count)})")
@@ -438,7 +529,8 @@ def profile(user: User, s: Settings, count: int, total: int, quills: int, battle
         f"💎 Кристаллы: <b>{user.crystals}</b>\n\n"
         f"🃏 Слов: {count} · ценность {cr(total)}\n"
         f"✒️ Создано слов: {user.words_created}\n"
-        f"⚔️ Рейтинг: {user.rating} · побед {user.wins} · поражений {user.losses}\n\n"
+        f"⚔️ Рейтинг: {user.rating} · побед {user.wins} · поражений {user.losses}\n"
+        f"🏅 Очки турнира недели: {user.week_points}\n\n"
         "<b>Сегодня</b>\n"
         f"✒️ Перья: {quills}/{q_limit}\n"
         f"⚔️ Бои: {battles}/{b_limit}"
@@ -485,11 +577,11 @@ def yookassa_link(p: Product) -> str:
         f"💳 <b>{esc(p.title)}</b> — {p.rub} ₽\n\n"
         "1. Нажми «Оплатить» и заверши оплату картой или через СБП.\n"
         "2. Вернись в бот — начислим автоматически в течение минуты.\n"
-        "Если не пришло — нажми «✅ Я оплатил»."
+        "Если не пришло — нажми «✅ Проверить оплату»."
     )
 
 
-PAYMENT_PENDING = "⏳ Оплата ещё не поступила. Если ты уже оплатил — подожди минуту и нажми ещё раз."
+PAYMENT_PENDING = "⏳ Оплата ещё не поступила. Если она уже прошла — подожди минуту и проверь ещё раз."
 PAYMENT_CANCELED = "❌ Платёж отменён или истёк. Создай новый через /buy."
 PAYMENT_UNAVAILABLE = "😔 Оплата этим способом временно недоступна. Попробуй другой способ."
 PRECHECKOUT_FAIL = "Этот товар недоступен или цена изменилась. Открой магазин заново: /buy"
@@ -515,7 +607,7 @@ SUB_ERROR = "Не удалось изменить подписку. Попроб
 
 
 def referral_welcome(bonus: int) -> str:
-    return f"🎁 Ты пришёл по приглашению друга — дарим <b>+{cr(bonus)}</b>!"
+    return f"🎁 Тебя пригласил друг — дарим <b>+{cr(bonus)}</b>!"
 
 
 def referral_reward(bonus: int, friend: str) -> str:
@@ -553,7 +645,7 @@ PROMO_USAGE = "Отправь промокод так: <code>/promo КОД</code
 PROMO_ERRORS = {
     "not_found": "❌ Такого промокода нет.",
     "expired": "⌛ Срок действия промокода истёк.",
-    "used": "Ты уже активировал этот промокод.",
+    "used": "Этот промокод уже активирован.",
     "exhausted": "😔 Промокод закончился.",
 }
 
@@ -568,7 +660,7 @@ def promo_ok(crystals: int, premium_days: int) -> str:
 
 
 SUBSCRIBE_REQUIRED = (
-    "📢 Чтобы захватывать слова бесплатно, подпишись на канал(ы) ниже и нажми «✅ Я подписался».\n\n"
+    "📢 Чтобы захватывать слова бесплатно, подпишись на канал(ы) ниже и нажми «✅ Проверить подписку».\n\n"
     "👑 Лордам подписка не нужна."
 )
 SUBSCRIBE_OK = "✅ Спасибо за подписку! Продолжай."
@@ -613,7 +705,8 @@ ADMIN_HELP = (
     "/give <code>id кол-во</code> — начислить кристаллы (минус — списать)\n"
     "/premium <code>id дней</code> — выдать статус Лорда\n"
     "/ban <code>id</code> · /unban <code>id</code>\n"
-    "/delcard <code>слово</code> — удалить карту (нарушение правил)\n"
+    "/delcard <code>слово</code> — удалить карту (нарушение правил) · /recent — новые слова\n"
+    "/health — проверить нейросеть, художника и оплату\n"
     "/auction_start <code>слово [часов]</code> — запустить аукцион сейчас\n"
     "/promo_new <code>КОД кристаллы [активаций] [дней_лорда] [дней_жизни]</code> · /promos\n"
     "/refund <code>charge_id</code> — вернуть звёзды\n"
@@ -630,7 +723,8 @@ def admin_stats(st: Stats) -> str:
         f"🔥 Активны сегодня: <b>{st.active_today}</b> · за 7 дней: {st.active_week}\n"
         f"👑 Лордов сейчас: <b>{st.premium_active}</b>\n"
         f"🚫 Заблокировали бота: {st.blocked}\n\n"
-        f"🃏 Слов занято: {st.cards_total} (+{st.cards_today} сегодня) · ⚔️ боёв сегодня: {st.battles_today}\n\n"
+        f"🃏 Слов занято: {st.cards_total} (+{st.cards_today} сегодня) · ⚔️ боёв сегодня: {st.battles_today}\n"
+        f"💎 Кристаллов у игроков: {st.crystals_total}\n\n"
         f"💰 Сегодня: {st.payments_today} оплат · {st.stars_today} ⭐ · {st.rub_today / 100:.0f} ₽\n"
         f"💰 Всего: {st.stars_total} ⭐ · {st.rub_total / 100:.0f} ₽ · платящих: {st.payers_total}"
     )

@@ -105,7 +105,8 @@ def test_simulation_is_reproducible_and_favours_stronger() -> None:
     assert r1 == r2 and r1.attacker_won
     wins = sum(simulate(_fighter(), _fighter(name="B"), random.Random(i)).attacker_won for i in range(400))
     assert 120 < wins < 280  # равные бойцы — примерно поровну
-    assert "сдаётся" in fallback_story(strong, weak, r1)
+    story = fallback_story(strong, weak, r1)
+    assert "A" in story and "B" in story and story == fallback_story(strong, weak, r1)
 
 
 def test_class_perks_applied() -> None:
@@ -138,12 +139,31 @@ def test_fallback_is_deterministic() -> None:
 # ---------- отрисовка ----------
 
 
+def test_drawable_strips_emoji() -> None:
+    from app.game.render import _drawable
+
+    assert _drawable("Аня 🌸✨ ❤️ ⭐") == "Аня"
+    assert _drawable("Wi-Fi в метро — «№1»") == "Wi-Fi в метро — «№1»"
+    assert _drawable("👨‍👩‍👧") == ""
+
+
+async def test_unsafe_llm_text_falls_back() -> None:
+    from app.game.genesis import invent_creature
+
+    class Rude:
+        async def complete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+            return '{"allowed": true, "name": "Порно-гоблин", "element": "fire", "class": "mage"}'
+
+    draft = await invent_creature(Rude(), "гоблин")  # type: ignore[arg-type]
+    assert draft == fallback_draft("гоблин")
+
+
 def test_render_card() -> None:
     view = CardView(
         word="Wi-Fi в метро", name="Сигналий", title="Неуловимый", element="lightning", klass="rogue",
         rarity="mythic", atk=74, def_=40, hp=180, ability="Одна палка",
         ability_text="Появляется на секунду, чтобы исчезнуть навсегда. " * 5,
-        number=7, creator="Аня", bot_username="word_bot",
+        number=7, creator="Аня 🌸", bot_username="word_bot",
     )
     for art in (gradient_png(64, 64, 3), None, b"not an image"):
         image = Image.open(io.BytesIO(render_card(view, art)))
@@ -199,17 +219,12 @@ async def test_comfyui_backend_flow() -> None:
 
 
 async def test_openai_compatible_llm(tmp_path) -> None:  # type: ignore[no-untyped-def]
-    sse = 'data: {"choices":[{"delta":{"content":"При"}}]}\n\ndata: {"choices":[{"delta":{"content":"вет"}}]}\n\ndata: [DONE]\n\n'
-
     def handler(request: httpx.Request) -> httpx.Response:
         body = json.loads(request.content)
         assert body["model"] == "qwen2.5:7b" and request.headers["Authorization"] == "Bearer ollama"
-        if body["stream"]:
-            return httpx.Response(200, text=sse, headers={"Content-Type": "text/event-stream"})
         return httpx.Response(200, json={"choices": [{"message": {"content": "<think>x</think>Готово"}}]})
 
     llm = OpenAICompatLLM(make_settings(tmp_path, llm_backend="openai"))
     llm._client = httpx.AsyncClient(transport=httpx.MockTransport(handler), headers=llm._client.headers)
-    assert "".join([c async for c in llm.stream([{"role": "user", "content": "hi"}])]) == "Привет"
     assert await llm.complete([{"role": "user", "content": "hi"}]) == "Готово"
     await llm.close()

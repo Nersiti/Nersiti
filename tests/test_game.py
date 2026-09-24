@@ -35,6 +35,7 @@ async def make_players(h: BotHarness) -> None:
     await h.feed(message_update("/start", user_id=200, name="Боря"))
     await claim(h, 100, "какао", "Аня")
     await claim(h, 200, "понедельник утром", "Боря")
+    await claim(h, 200, "вечерний чай", "Боря")  # второе слово: последнее слово игрока захватить нельзя
 
 
 def fixed_result(attacker_won: bool):  # type: ignore[no-untyped-def]
@@ -90,7 +91,7 @@ async def test_taken_word_shows_owner_card(harness: BotHarness) -> None:
     photo = harness.session.of(SendPhoto)[-1]
     assert "Владелец: Аня" in photo.caption
     buttons = [b.text for row in photo.reply_markup.inline_keyboard for b in row]
-    assert any("Захватить" in b for b in buttons) and any("выкуп" in b for b in buttons)
+    assert any("Защищено до" in b for b in buttons) and any("выкуп" in b for b in buttons)  # иммунитет нового слова
 
 
 async def test_reserved_invalid_and_forbidden_words(harness: BotHarness) -> None:
@@ -211,7 +212,7 @@ async def test_arena_finds_opponent(harness: BotHarness) -> None:
     mine = await harness.card("какао")
     harness.session.clear()
     await harness.feed(callback_update(kb.ArenaCb(mine=mine.id).pack(), user_id=100))
-    assert any("«Понедельник утром»" in t for t in harness.session.texts())
+    assert any("«Понедельник утром»" in t or "«Вечерний чай»" in t for t in harness.session.texts())
 
 
 async def test_capture_blocked_by_immunity(harness: BotHarness) -> None:
@@ -340,7 +341,7 @@ async def test_auction_bids_and_award(harness: BotHarness) -> None:
     card = await harness.card("любовь")
     assert card.owner_id == 200 and card.rarity in ("legendary", "mythic") and card.file_id
     assert (await harness.ctx.auctions.get(auction.id)).card_id == card.id
-    assert any(r.chat_id == 200 and "выиграл аукцион" in r.text for r in harness.session.of(SendMessage))
+    assert any(r.chat_id == 200 and "Победа на аукционе" in r.text for r in harness.session.of(SendMessage))
 
     await game_tick(harness.bot, harness.ctx)  # повторный тик не создаёт вторую карту
     assert len([p for p in harness.session.of(SendPhoto) if p.chat_id == 200]) == 1

@@ -9,11 +9,11 @@ from typing import TYPE_CHECKING
 from aiogram import Bot
 from aiogram.exceptions import TelegramAPIError, TelegramForbiddenError, TelegramRetryAfter
 from aiogram.types import InlineKeyboardMarkup
-from sqlalchemy import select, update
+from sqlalchemy import case, or_, select, update
 
 from app import texts
 from app.db.models import User
-from app.utils import sanitize_tag
+from app.utils import local_today, sanitize_tag
 
 if TYPE_CHECKING:
     from app.context import Services
@@ -64,7 +64,10 @@ async def reward_inviter(bot: Bot, ctx: Services, user: User) -> None:
     """Pay the inviter once the friend claims their first word (protection from fake accounts)."""
     if not user.referrer_id or user.referral_rewarded:
         return
-    bonus = ctx.settings.ref_bonus_inviter
+    settings = ctx.settings
+    bonus = settings.ref_bonus_inviter
+    today = local_today(settings.tz)
+    paid = False
     async with ctx.db.begin() as s:
         result = await s.execute(
             update(User).where(User.id == user.id, User.referral_rewarded.is_(False)).values(referral_rewarded=True)
@@ -72,13 +75,24 @@ async def reward_inviter(bot: Bot, ctx: Services, user: User) -> None:
         if result.rowcount != 1:
             return
         if bonus:
-            await s.execute(
+            # не больше ref_daily_cap наград в день — фермы фейковых аккаунтов не окупаются
+            same_day = User.ref_day == today
+            rewarded = await s.execute(
                 update(User)
-                .where(User.id == user.referrer_id)
-                .values(crystals=User.crystals + bonus, ref_earned=User.ref_earned + bonus)
+                .where(
+                    User.id == user.referrer_id,
+                    or_(User.ref_day.is_(None), User.ref_day != today, User.ref_day_count < settings.ref_daily_cap),
+                )
+                .values(
+                    crystals=User.crystals + bonus,
+                    ref_earned=User.ref_earned + bonus,
+                    ref_day=today,
+                    ref_day_count=case((same_day, User.ref_day_count + 1), else_=1),
+                )
             )
+            paid = rewarded.rowcount == 1
     user.referral_rewarded = True
-    if bonus:
+    if paid:
         await notify(bot, user.referrer_id, texts.referral_reward(bonus, user.first_name or "Друг"))
 
 

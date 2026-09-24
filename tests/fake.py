@@ -16,10 +16,15 @@ from aiogram.methods import (
     EditMessageText,
     GetChatMember,
     GetMe,
+    GetMyCommands,
+    GetMyDescription,
+    GetMyShortDescription,
     SendPhoto,
     TelegramMethod,
 )
 from aiogram.types import (
+    BotDescription,
+    BotShortDescription,
     CallbackQuery,
     Chat,
     ChatMemberLeft,
@@ -61,6 +66,12 @@ class FakeSession(BaseSession):
             if self.member_status == "left":
                 return ChatMemberLeft(user=User(id=method.user_id, is_bot=False, first_name="U"))
             return ChatMemberMember(user=User(id=method.user_id, is_bot=False, first_name="U"))
+        if isinstance(method, GetMyCommands):
+            return []
+        if isinstance(method, GetMyDescription):
+            return BotDescription(description="")
+        if isinstance(method, GetMyShortDescription):
+            return BotShortDescription(short_description="")
         if isinstance(method, CreateInvoiceLink):
             return "https://t.me/$test_invoice"
         if isinstance(method, CopyMessage):

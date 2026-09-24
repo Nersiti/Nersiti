@@ -27,12 +27,16 @@ class MenuCb(CallbackData, prefix="m"):
 
 
 class ClaimCb(CallbackData, prefix="w"):
-    token: str
+    w: str  # само слово или «~токен», если слово не помещается в 64 байта callback_data
 
 
 class CardCb(CallbackData, prefix="c"):
     id: int
-    action: str  # view | fight | capture | offer | shield | redraw
+    action: str  # view | fight | capture | offer | shield | redraw | report
+
+
+class AdminCardCb(CallbackData, prefix="ac"):
+    id: int
 
 
 class FightCb(CallbackData, prefix="f"):
@@ -103,9 +107,18 @@ def url_kb(text: str, url: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=text, url=url)]])
 
 
-def claim_kb(token: str, paid_price: int) -> InlineKeyboardMarkup:
+def claim_kb(value: str, paid_price: int) -> InlineKeyboardMarkup:
     label = "✒️ Захватить!" if not paid_price else f"✒️ Захватить за {paid_price} 💎"
-    return InlineKeyboardMarkup(inline_keyboard=[[_b(label, ClaimCb(token=token))]])
+    return InlineKeyboardMarkup(inline_keyboard=[[_b(label, ClaimCb(w=value))]])
+
+
+def claim_value(display: str, put_token) -> str:  # type: ignore[no-untyped-def]
+    """The word goes straight into the button (survives a bot restart); a long one — through a token."""
+    try:
+        ClaimCb(w=display).pack()
+        return display
+    except ValueError:
+        return "~" + put_token(display)
 
 
 def card_link_kb(card_id: int, text: str = "🃏 К слову") -> InlineKeyboardMarkup:
@@ -116,19 +129,22 @@ def share_button(card: Card) -> InlineKeyboardButton:
     return InlineKeyboardButton(text="📤 Показать друзьям", switch_inline_query=card.display)
 
 
-def card_kb(card: Card, viewer_id: int, shield_price: int, redraw_price: int) -> InlineKeyboardMarkup:
+def card_kb(
+    card: Card, viewer_id: int, shield_price: int, redraw_price: int, capture_lock: str | None = None
+) -> InlineKeyboardMarkup:
     if card.owner_id == viewer_id:
         redraw = "🎨 Дорисовать арт" if not card.has_art else f"🎨 Перерисовать · {redraw_price} 💎"
         rows = [
             [_b(f"🛡 Щит · {shield_price} 💎", CardCb(id=card.id, action="shield")), _b("⚔️ В бой", ArenaCb(mine=card.id))],
-            [_b(redraw, CardCb(id=card.id, action="redraw"))],
             [share_button(card)],
+            [_b(redraw, CardCb(id=card.id, action="redraw"))],
         ]
     else:
+        capture = f"🔒 {capture_lock}" if capture_lock else f"🏴 Захватить · {card.value} 💎"
         rows = [
-            [_b("⚔️ Бой", CardCb(id=card.id, action="fight")), _b(f"🏴 Захватить · {card.value} 💎", CardCb(id=card.id, action="capture"))],
+            [_b("⚔️ Бой", CardCb(id=card.id, action="fight")), _b(capture, CardCb(id=card.id, action="capture"))],
             [_b("💰 Предложить выкуп", CardCb(id=card.id, action="offer"))],
-            [share_button(card)],
+            [share_button(card), _b("🚩", CardCb(id=card.id, action="report"))],
         ]
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
@@ -182,6 +198,22 @@ def auction_kb(a: Auction, min_bid: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[buttons, [_b("🔄 Обновить", MenuCb(action="auction"))]])
 
 
+def first_card_kb() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[[_b("⚔️ На арену", MenuCb(action="arena")), _b("🎁 Позвать друзей", MenuCb(action="bonus"))]]
+    )
+
+
+def shop_link_kb() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[[_b("💎 Магазин", MenuCb(action="shop"))]])
+
+
+def admin_card_kb(card_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[[_b("🗑 Удалить карту", AdminCardCb(id=card_id)), _b("🃏 Открыть", CardCb(id=card_id, action="view"))]]
+    )
+
+
 def no_crystals_kb() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
@@ -212,7 +244,7 @@ def methods_kb(product: Product, methods: list[str]) -> InlineKeyboardMarkup:
 
 def yookassa_kb(url: str, payment_id: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
-        inline_keyboard=[[InlineKeyboardButton(text="💳 Оплатить", url=url)], [_b("✅ Я оплатил", CheckCb(pid=payment_id))]]
+        inline_keyboard=[[InlineKeyboardButton(text="💳 Оплатить", url=url)], [_b("✅ Проверить оплату", CheckCb(pid=payment_id))]]
     )
 
 
@@ -237,7 +269,7 @@ def bonus_kb(link: str, share_text: str, can_claim: bool) -> InlineKeyboardMarku
 
 def channels_kb(channels: list[Channel]) -> InlineKeyboardMarkup:
     rows = [[InlineKeyboardButton(text=f"📢 Подписаться — канал {i}", url=ch.url)] for i, ch in enumerate(channels, 1)]
-    rows.append([_b("✅ Я подписался", MenuCb(action="check_sub"))])
+    rows.append([_b("✅ Проверить подписку", MenuCb(action="check_sub"))])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 

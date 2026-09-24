@@ -113,25 +113,65 @@ def _describe(a: Fighter, d: Fighter, result: BattleResult) -> str:
         f"Атакует: {a.name} (слово «{a.word}», стихия {ELEMENTS[a.element].label}, способность «{a.ability}»).",
         f"Защищается: {d.name} (слово «{d.word}», стихия {ELEMENTS[d.element].label}, способность «{d.ability}»).",
     ]
+    other = {"a": "d", "d": "a"}
     for ev in result.events:
-        if ev.kind in ("crit", "ability", "dodge"):
-            lines.append(f"Раунд {ev.round}: {names[ev.actor]} — {ev.kind} {ev.value or ''}".strip())
+        if ev.kind == "crit":
+            lines.append(f"Раунд {ev.round}: {names[ev.actor]} наносит критический удар ({ev.value} урона)")
+        elif ev.kind == "ability":
+            lines.append(f"Раунд {ev.round}: {names[ev.actor]} применяет способность ({ev.value} урона)")
+        elif ev.kind == "dodge":
+            lines.append(f"Раунд {ev.round}: {names[other[ev.actor]]} уклоняется от удара {names[ev.actor]}")
     winner = a if result.attacker_won else d
     lines.append(f"Бой длился {result.rounds} раунд(ов). Победил: {winner.name}.")
     return "\n".join(lines)
 
 
+_OPENINGS = (
+    "{a} бросается на {d}!",
+    "Арена замирает: {a} против {d}.",
+    "{d} даже не успевает приготовиться — {a} уже атакует.",
+    "{a} вызывает {d} на бой и не ждёт ответа.",
+)
+_ADVANTAGE = ("Стихия на стороне {w}: {we} сильнее, чем {le}.",)
+_CRITS = (
+    "Один сокрушительный удар заставляет зрителей ахнуть.",
+    "Удар такой силы, что по арене идут трещины.",
+    "Зал взрывается криком: это был критический удар!",
+)
+_ABILITY = (
+    "В ход идёт способность «{ability}» — искры летят во все стороны.",
+    "{who} вспоминает про «{ability}», и бой переворачивается.",
+)
+_DODGES = ("{who} ускользает от удара в последний миг.", "{who} уходит из-под удара — лишь ветер свистит мимо.")
+_ENDINGS = (
+    "После {n}-го раунда {l} сдаётся, а {w} празднует победу.",
+    "На {n}-м раунде всё кончено: победа за {w}.",
+    "{w} добивает соперника в {n}-м раунде. {l} уходит зализывать раны.",
+)
+
+
 def fallback_story(a: Fighter, d: Fighter, result: BattleResult) -> str:
+    """Battle narration without the LLM: assembled from the actual battle events."""
+    rng = random.Random(f"{a.name}|{d.name}|{result.rounds}|{result.attacker_won}")
+    fighters = {"a": a, "d": d}
     winner, loser = (a, d) if result.attacker_won else (d, a)
-    parts = [f"{a.name} бросается на {d.name}!"]
-    kinds = {ev.kind for ev in result.events}
-    if "ability" in kinds:
-        parts.append("В самый отчаянный момент в ход идут способности — искры летят во все стороны.")
-    if "crit" in kinds:
-        parts.append("Один сокрушительный удар заставляет зрителей ахнуть.")
-    if "dodge" in kinds:
-        parts.append("Кто-то ловко уворачивается, будто заранее знал, куда бьют.")
-    parts.append(f"После {result.rounds}-го раунда {loser.name} сдаётся, а {winner.name} празднует победу.")
+    parts = [rng.choice(_OPENINGS).format(a=a.name, d=d.name)]
+    if element_multiplier(winner.element, loser.element) > 1:
+        parts.append(
+            rng.choice(_ADVANTAGE).format(
+                w=winner.name, we=ELEMENTS[winner.element].label.lower(), le=ELEMENTS[loser.element].label.lower()
+            )
+        )
+    by_kind = {ev.kind: ev for ev in result.events}
+    if "ability" in by_kind:
+        who = fighters[by_kind["ability"].actor]
+        parts.append(rng.choice(_ABILITY).format(who=who.name, ability=who.ability or "тайный приём"))
+    if "crit" in by_kind:
+        parts.append(rng.choice(_CRITS))
+    if "dodge" in by_kind:
+        dodger = fighters["d" if by_kind["dodge"].actor == "a" else "a"]
+        parts.append(rng.choice(_DODGES).format(who=dodger.name))
+    parts.append(rng.choice(_ENDINGS).format(n=result.rounds, w=winner.name, l=loser.name))
     return " ".join(parts)
 
 

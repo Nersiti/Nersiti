@@ -34,6 +34,7 @@ def make_settings(tmp_path: Path, **overrides: Any) -> Settings:
         "image_backend": "mock",
         "admin_ids": [ADMIN_ID],
         "auction_enabled": False,
+        "top_cache_seconds": 0,
         "throttle_seconds": 0,
         "support_contact": "@support",
     }

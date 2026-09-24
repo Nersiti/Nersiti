@@ -26,6 +26,9 @@ class KVStore:
         self._cache[key] = (time.monotonic() + self.ttl, value)
         return value
 
+    def forget(self, key: str) -> None:
+        self._cache.pop(key, None)
+
     async def set(self, key: str, value: str | None) -> None:
         async with self.db.begin() as s:
             await repo.kv_set(s, key, value)

@@ -55,7 +55,7 @@ async def test_promo_codes(harness: BotHarness) -> None:
     assert (await harness.user(100)).crystals == base + 50
     assert (await harness.user(200)).crystals == base
     texts = harness.session.texts()
-    assert any("уже активировал" in t for t in texts) and any("закончился" in t for t in texts)
+    assert any("уже активирован" in t for t in texts) and any("закончился" in t for t in texts)
 
 
 async def test_daily_bonus_once(harness: BotHarness) -> None:

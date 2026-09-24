@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from typing import TYPE_CHECKING
 
 from aiogram import Bot, Dispatcher
@@ -11,24 +12,27 @@ from aiogram.exceptions import TelegramAPIError
 from aiogram.types import BotCommand, BufferedInputFile, ErrorEvent
 from sqlalchemy import select
 
-from app import keyboards as kb
 from app import texts
 from app.config import Settings
 from app.context import Services
 from app.db.database import Database
 from app.db.models import Auction, Card
 from app.game.auction import AUCTION_RARITIES, AuctionService
-from app.game.service import REDRAW_PRICE, GameService, public_name
+from app.game.retention import retention_tick
+from app.game.service import GameService, public_name
 from app.handlers import setup_routers
+from app.handlers.game import card_markup
 from app.middlewares import ThrottlingMiddleware, UserMiddleware
 from app.services.channels import ChannelGate
 from app.services.growth import announce, notify
+from app.services.health import GuardedImages, GuardedLLM, health_report
 from app.services.images import create_image_backend
 from app.services.kv import KVStore
 from app.services.llm import create_llm
 from app.services.payments.service import PaymentService
 from app.services.payments.yookassa import YooKassaClient
 from app.services.queue import GenerationQueue
+from app.utils import esc
 
 if TYPE_CHECKING:
     from app.db.models import User
@@ -36,13 +40,14 @@ if TYPE_CHECKING:
 log = logging.getLogger(__name__)
 
 LOOP_INTERVAL = 30.0
+ERROR_NOTIFY_INTERVAL = 600.0
 
 USER_COMMANDS = [
     BotCommand(command="start", description="🏠 Главное меню"),
     BotCommand(command="cards", description="🃏 Мои слова"),
     BotCommand(command="arena", description="⚔️ Арена"),
     BotCommand(command="auction", description="🔨 Аукцион дня"),
-    BotCommand(command="top", description="🏆 Топ мира слов"),
+    BotCommand(command="top", description="🏆 Топ и турнир недели"),
     BotCommand(command="buy", description="💎 Магазин"),
     BotCommand(command="bonus", description="🎁 Бесплатные кристаллы"),
     BotCommand(command="profile", description="👤 Профиль"),
@@ -64,8 +69,8 @@ DESCRIPTION = (
 def build_services(settings: Settings) -> Services:
     db = Database(settings.database_url)
     kv = KVStore(db)
-    llm = create_llm(settings)
-    images = create_image_backend(settings)
+    llm = GuardedLLM(create_llm(settings))
+    images = GuardedImages(create_image_backend(settings))
     gen = GenerationQueue(settings.image_workers)
     yookassa = None
     if settings.yookassa_enabled:
@@ -97,10 +102,17 @@ def build_dispatcher(ctx: Services) -> Dispatcher:
     dp.update.outer_middleware(UserMiddleware(ctx))
     dp.message.middleware(ThrottlingMiddleware(ctx.settings.throttle_seconds))
     dp.include_router(setup_routers())
+    last_error_notice = 0.0
 
     @dp.errors()
-    async def on_error(event: ErrorEvent) -> bool:
+    async def on_error(event: ErrorEvent, bot: Bot) -> bool:
+        nonlocal last_error_notice
         log.exception("Unhandled error: %r", event.exception, exc_info=event.exception)
+        if time.monotonic() - last_error_notice > ERROR_NOTIFY_INTERVAL:
+            last_error_notice = time.monotonic()
+            text = f"⚠️ Ошибка в боте: <code>{esc(type(event.exception).__name__)}: {esc(str(event.exception))[:300]}</code>"
+            for admin_id in ctx.settings.admin_ids:
+                await notify(bot, admin_id, text)
         return True
 
     async def on_startup(bot: Bot) -> None:
@@ -131,7 +143,9 @@ async def award_auction(bot: Bot, ctx: Services, auction: Auction, winner: User)
         return
     card_id = await ctx.game.reserve_for_auction(winner.id, auction.word, auction.display)
     me = await bot.me()
-    created = await ctx.game.create_card(card_id, None, True, me.username or "", rarities=AUCTION_RARITIES)
+    created = await ctx.game.create_card(
+        card_id, None, True, me.username or "", rarities=AUCTION_RARITIES, forced=True
+    )
     await ctx.auctions.attach_card(auction.id, card_id)
     card = created.card
     try:
@@ -139,7 +153,7 @@ async def award_auction(bot: Bot, ctx: Services, auction: Auction, winner: User)
             winner.id,
             BufferedInputFile(created.image, f"card_{card.id}.jpg"),
             caption=texts.card_caption(card, winner, ctx.settings, winner.id),
-            reply_markup=kb.card_kb(card, winner.id, ctx.game.shield_price(card), REDRAW_PRICE),
+            reply_markup=await card_markup(card, winner.id, ctx),
         )
         if sent.photo:
             await ctx.game.set_file_id(card.id, sent.photo[-1].file_id)
@@ -169,6 +183,7 @@ async def game_tick(bot: Bot, ctx: Services) -> None:
         await announce(bot, ctx, texts.news_auction_start(started, ctx.settings))
     for offer in await ctx.game.expire_offers():
         await notify(bot, offer.buyer_id, texts.offer_expired(offer.price))
+    await retention_tick(bot, ctx)
 
 
 async def game_loop(bot: Bot, ctx: Services) -> None:
@@ -185,6 +200,19 @@ async def game_loop(bot: Bot, ctx: Services) -> None:
 # ---------- запуск ----------
 
 
+async def configure_profile(bot: Bot) -> None:
+    """Commands and bot description — only if they changed (Telegram limits how often they can be changed)."""
+    try:
+        if (await bot.get_my_commands()) != USER_COMMANDS:
+            await bot.set_my_commands(USER_COMMANDS)
+        if (await bot.get_my_short_description()).short_description != SHORT_DESCRIPTION:
+            await bot.set_my_short_description(SHORT_DESCRIPTION)
+        if (await bot.get_my_description()).description != DESCRIPTION:
+            await bot.set_my_description(DESCRIPTION)
+    except TelegramAPIError as e:
+        log.warning("Can't update bot profile: %s", e)
+
+
 async def startup(bot: Bot, ctx: Services, configure_bot: bool = True, background: bool = True) -> None:
     await ctx.db.create_all()
     ctx.gen.start()
@@ -192,15 +220,13 @@ async def startup(bot: Bot, ctx: Services, configure_bot: bool = True, backgroun
         ctx.tasks.append(asyncio.create_task(game_loop(bot, ctx), name="game-loop"))
         if ctx.payments.yookassa is not None:
             ctx.tasks.append(asyncio.create_task(ctx.payments.poll_yookassa(bot), name="yookassa-poll"))
-    if configure_bot:
-        try:
-            await bot.set_my_commands(USER_COMMANDS)
-            await bot.set_my_short_description(SHORT_DESCRIPTION)
-            await bot.set_my_description(DESCRIPTION)
-        except TelegramAPIError as e:
-            log.warning("Can't update bot profile: %s", e)
     me = await bot.me()
-    log.info("Bot @%s started. Payment methods: %s", me.username, ctx.payments.methods())
+    if configure_bot:
+        await configure_profile(bot)
+        report = await health_report(ctx.settings, ctx.payments.methods())
+        log.info("Bot @%s started\n%s", me.username, report)
+        for admin_id in ctx.settings.admin_ids:
+            await notify(bot, admin_id, f"🚀 <b>@{esc(me.username or '')} запущен</b>\n\n{report}\n\nПроверить снова: /health")
 
 
 async def shutdown(ctx: Services) -> None:

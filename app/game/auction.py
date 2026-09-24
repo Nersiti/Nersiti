@@ -152,13 +152,23 @@ class AuctionService:
         return start, end
 
     async def pick_word(self) -> str | None:
+        words = list(reserved_words())
         async with self.db.session() as s:
-            taken = set((await s.scalars(select(Card.word))).all())
+            taken = set((await s.scalars(select(Card.word).where(Card.word.in_(words)))).all())
             busy = set(
-                (await s.scalars(select(Auction.word).where(Auction.status.in_(("active", "finished"))))).all()
+                (
+                    await s.scalars(
+                        select(Auction.word).where(
+                            Auction.word.in_(words), Auction.status.in_(("active", "finished", "refunded"))
+                        )
+                    )
+                ).all()
             )
-        free = [w for w in reserved_words() if w not in taken and w not in busy]
+        free = [w for w in words if w not in taken and w not in busy]
         return random.choice(free) if free else None
+
+    def time_left(self, auction: Auction) -> timedelta:
+        return max(auction.ends_at - utcnow(), timedelta())
 
     async def maybe_start_daily(self) -> Auction | None:
         if not self.settings.auction_enabled:

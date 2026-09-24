@@ -75,7 +75,18 @@ class Settings(BaseSettings):
     ref_bonus_inviter: int = 30
     ref_bonus_invitee: int = 15
     ref_percent: int = 10
+    ref_daily_cap: int = 20  # сколько реферальных наград в день максимум (защита от ферм фейков)
     ad_every: int = 4  # реклама бесплатным игрокам каждые N боёв (0 — выключить)
+    first_word_rare: bool = True  # первое слово игрока — минимум редкое
+    last_word_protected: bool = True  # последнее слово игрока нельзя захватить
+
+    # --- Удержание ---
+    reminders_enabled: bool = True
+    remind_after_days: int = 3  # напомнить, если игрок не заходил N дней
+    remind_every_days: int = 7  # и не чаще, чем раз в N дней
+    tournament_enabled: bool = True
+    tournament_prizes: Annotated[list[int], NoDecode] = Field(default_factory=lambda: [300, 150, 75])
+    top_cache_seconds: float = 60.0
 
     # --- Аукцион «горячих» слов ---
     auction_enabled: bool = True
@@ -99,7 +110,7 @@ class Settings(BaseSettings):
     required_channels: Annotated[list[str], NoDecode] = Field(default_factory=list)
     news_channel: str = ""  # канал «Хроника мира слов»: легендарные карты, захваты, аукционы
 
-    @field_validator("admin_ids", "required_channels", mode="before")
+    @field_validator("admin_ids", "required_channels", "tournament_prizes", mode="before")
     @classmethod
     def _split_csv(cls, value: Any) -> Any:
         return _csv(value)

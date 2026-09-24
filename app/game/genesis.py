@@ -12,6 +12,7 @@ from dataclasses import dataclass
 
 from app.game.rules import CLASSES, ELEMENTS
 from app.services.llm import LLMClient
+from app.services.moderation import is_prompt_allowed
 
 log = logging.getLogger(__name__)
 
@@ -32,12 +33,20 @@ GENESIS_PROMPT = """Ты — геймдизайнер коллекционной
  "lore": "история существа, смешно, до 170 символов",
  "art": "English prompt for the card illustration: describe the creature, its appearance, pose, background. No text. Up to 45 words."}
 
+Пример для слова «будильник»:
+{"allowed": true, "name": "Звонарь Рассвета", "title": "Враг сладкого сна", "element": "lightning", "class": "rogue",
+ "atk": 8, "def": 3, "hp": 5, "ability": "Ещё пять минут",
+ "ability_text": "Противник засыпает на ход и просыпается уже опоздавшим.",
+ "lore": "Живёт на тумбочке и питается чужими снами. Боится только севшей батарейки.",
+ "art": "mischievous little creature made of an old brass alarm clock, bells as horns, crackling blue sparks, cozy bedroom at dawn"}
+
 Обычные имена и ники (Анна, Макс, Котик2007) разрешены. Бренды и названия вещей разрешены.
 Если слово — имя или фамилия конкретного известного человека (политика, знаменитости), политическая партия или лозунг,
 оскорбление религии или национальности, мат, 18+, наркотики, экстремизм или насилие над людьми —
 верни {"allowed": false, "reason": "кратко почему"}."""
 
 _JSON = re.compile(r"\{.*\}", re.S)
+_TRAILING_COMMA = re.compile(r",\s*([}\]])")
 
 _TITLES = ("Неудержимый", "Древний", "Коварный", "Великолепный", "Вечный", "Загадочный", "Грозный", "Хитроумный")
 _ABILITIES = (
@@ -83,10 +92,14 @@ def _num(value: object, default: float = 5.0) -> float:
 
 def parse_draft(raw: str, word: str) -> CreatureDraft:
     """Parse the model's response. Raises NotAllowed or ValueError."""
-    match = _JSON.search(raw)
+    match = _JSON.search(raw.replace("```json", "").replace("```", ""))
     if not match:
         raise ValueError("no JSON in LLM answer")
-    data = json.loads(match.group(0))
+    chunk = match.group(0)
+    try:
+        data = json.loads(chunk)
+    except ValueError:
+        data = json.loads(_TRAILING_COMMA.sub(r"\1", chunk))  # маленькие модели любят лишние запятые
     if not isinstance(data, dict):
         raise ValueError("LLM JSON is not an object")
     if data.get("allowed") is False:
@@ -142,7 +155,12 @@ async def invent_creature(llm: LLMClient, word: str, timeout: float = 60.0) -> C
         )
         if not raw.strip():  # нейросеть не подключена (LLM_BACKEND=mock)
             return fallback_draft(word)
-        return parse_draft(raw, word)
+        draft = parse_draft(raw, word)
+        texts = " ".join((draft.name, draft.title, draft.ability, draft.ability_text, draft.lore))
+        if not is_prompt_allowed(texts) or not is_prompt_allowed(draft.art):
+            log.warning("LLM produced unsafe text for %r, using fallback", word)
+            return fallback_draft(word)
+        return draft
     except NotAllowed:
         raise
     except Exception as e:  # noqa: BLE001 — игра должна работать и без LLM

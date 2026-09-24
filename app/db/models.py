@@ -39,11 +39,16 @@ class User(Base):
     wins: Mapped[int] = mapped_column(Integer, default=0)
     losses: Mapped[int] = mapped_column(Integer, default=0)
     words_created: Mapped[int] = mapped_column(Integer, default=0)
+    week_points: Mapped[int] = mapped_column(Integer, default=0, index=True)  # турнир недели
 
-    # рост
+    # рост и удержание
     referrer_id: Mapped[int | None] = mapped_column(BigInteger, index=True)
     referral_rewarded: Mapped[bool] = mapped_column(Boolean, default=False)
     ref_earned: Mapped[int] = mapped_column(Integer, default=0)
+    ref_day: Mapped[date | None] = mapped_column(Date)  # лимит реферальных наград в день
+    ref_day_count: Mapped[int] = mapped_column(Integer, default=0)
+    reminded_at: Mapped[datetime | None] = mapped_column(DateTime)
+    lord_notice_until: Mapped[datetime | None] = mapped_column(DateTime)
     source: Mapped[str | None] = mapped_column(String(64), index=True)
 
     stars_spent: Mapped[int] = mapped_column(Integer, default=0)
@@ -79,6 +84,7 @@ class Card(Base):
     art_prompt: Mapped[str] = mapped_column(Text, default="")
     file_id: Mapped[str | None] = mapped_column(String(255))
     has_art: Mapped[bool] = mapped_column(Boolean, default=False)
+    quill_paid: Mapped[int] = mapped_column(Integer, default=0)  # вернуть, если создание карты оборвалось
 
     level: Mapped[int] = mapped_column(Integer, default=1)
     xp: Mapped[int] = mapped_column(Integer, default=0)
@@ -88,6 +94,7 @@ class Card(Base):
 
     protected_until: Mapped[datetime | None] = mapped_column(DateTime)
     shield_until: Mapped[datetime | None] = mapped_column(DateTime)
+    revenge_to: Mapped[int | None] = mapped_column(BigInteger, index=True)  # кому напомнить «можно отбить»
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
     owned_since: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 

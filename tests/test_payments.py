@@ -76,6 +76,17 @@ async def test_lord_subscription_and_renewal(harness: BotHarness) -> None:
     assert (await harness.user(100)).sub_canceled
 
 
+async def test_refund_of_subscription_cancels_renewal(harness: BotHarness) -> None:
+    await harness.feed(message_update("/start", user_id=100))
+    await harness.feed(payment_update("lord_month:100", "XTR", 249, "sub-9", is_recurring=True, is_first_recurring=True))
+    await harness.feed(message_update("/refund sub-9", user_id=ADMIN_ID))
+    edit = harness.session.of(EditUserStarSubscription)[-1]
+    assert edit.telegram_payment_charge_id == "sub-9" and edit.is_canceled
+    user = await harness.user(100)
+    assert user.sub_canceled and user.premium_until is None
+    assert user.crystals == harness.ctx.settings.start_crystals
+
+
 async def test_lord_gets_more_quills(harness_factory) -> None:  # type: ignore[no-untyped-def]
     h = await harness_factory(free_quills_per_day=1, lord_quills_per_day=5, start_crystals=0, lord_bonus_crystals=0)
     await h.feed(message_update("/start", user_id=100))

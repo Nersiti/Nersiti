@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import random
+import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Literal
@@ -22,7 +23,7 @@ from app.db.database import Database
 from app.db.models import Auction, Battle, Card, Offer, User
 from app.game import rules
 from app.game.battle import BattleResult, Fighter, simulate, tell_story
-from app.game.genesis import NotAllowed, invent_creature
+from app.game.genesis import NotAllowed, fallback_draft, invent_creature
 from app.game.render import CardView, render_card
 from app.game.words import is_reserved
 from app.services.images import ImageBackend, build_request
@@ -36,6 +37,23 @@ ART_STYLE = (
     "fantasy trading card illustration, single creature, centered composition, dramatic lighting, "
     "vivid colors, highly detailed digital painting"
 )
+ART_RARITY = {
+    "common": "",
+    "rare": "polished details",
+    "epic": "epic composition, magical aura",
+    "legendary": "legendary, masterpiece, golden rim light, epic scale",
+    "mythic": "mythical, cosmic, iridescent ethereal glow, awe-inspiring, masterpiece",
+}
+ART_ELEMENT = {
+    "fire": "flames and glowing embers",
+    "water": "splashing water, deep blue tones",
+    "nature": "lush leaves and vines, green light",
+    "lightning": "crackling lightning, electric sparks",
+    "earth": "stone and crystals, dusty warm tones",
+    "dark": "shadows and violet mist",
+    "light": "radiant holy light, soft glow",
+}
+FIRST_WORD_RARITIES = ["rare", "epic", "legendary", "mythic"]
 REDRAW_PRICE = 20
 STALE_CREATING = timedelta(minutes=15)
 
@@ -135,6 +153,11 @@ def protection_until(card: Card) -> datetime | None:
     return max(moments) if moments else None
 
 
+def art_prompt(prompt: str, rarity: str, element: str) -> str:
+    parts = [prompt, ART_ELEMENT.get(element, ""), ART_RARITY.get(rarity, ""), ART_STYLE]
+    return ", ".join(p for p in parts if p)
+
+
 class GameService:
     def __init__(
         self, db: Database, settings: Settings, llm: LLMClient, images: ImageBackend, gen: GenerationQueue
@@ -144,6 +167,16 @@ class GameService:
         self.llm = llm
         self.images = images
         self.gen = gen
+        self._top_cache: dict[str, tuple[float, object]] = {}
+
+    async def _cached(self, key: str, factory):  # type: ignore[no-untyped-def]
+        ttl = self.settings.top_cache_seconds
+        hit = self._top_cache.get(key)
+        if ttl > 0 and hit and hit[0] > time.monotonic():
+            return hit[1]
+        value = await factory()
+        self._top_cache[key] = (time.monotonic() + ttl, value)
+        return value
 
     # ---------- кошелёк и дневные лимиты ----------
 
@@ -253,6 +286,7 @@ class GameService:
                     creator_id=user_id,
                     created_at=now,
                     owned_since=now,
+                    quill_paid=spend.price,
                 )
                 s.add(card)
                 await s.flush()
@@ -277,8 +311,8 @@ class GameService:
             if spend:
                 await self.refund_daily(s, owner_id, spend)
 
-    async def draw_art(self, prompt: str, lord: bool) -> bytes | None:
-        req = build_request(self.settings, f"{prompt}, {ART_STYLE}", "auto", "3x2")  # под окно арта на карте
+    async def draw_art(self, prompt: str, lord: bool, rarity: str = "common", element: str = "") -> bytes | None:
+        req = build_request(self.settings, art_prompt(prompt, rarity, element), "3x2")  # под окно арта на карте
         priority = PRIORITY_PREMIUM if lord else PRIORITY_FREE
         try:
             return await self.gen.submit(lambda: self.images.generate(req), priority)
@@ -314,23 +348,33 @@ class GameService:
         lord: bool,
         bot_username: str = "",
         rarities: list[str] | None = None,
+        forced: bool = False,
     ) -> Created:
-        """Invent a creature, draw the art, and render the card. On error, the reservation is dropped and the quill refunded."""
+        """Invent a creature, draw the art, and render the card. On error, the reservation is dropped and the quill refunded.
+
+        ``forced`` — the word was picked by the game itself (auction): if the LLM refuses, a template creature is used.
+        """
         async with self.db.session() as s:
             card = await s.get(Card, card_id)
             assert card is not None
-            creator = await self._creator_name(s, card)
+            creator_user = await s.get(User, card.creator_id)
+            creator = public_name(creator_user)
         try:
             draft = await invent_creature(self.llm, card.word)
         except NotAllowed as e:
-            await self._drop_reservation(card_id, card.owner_id, spend)
-            raise GameError("forbidden", reason=e.reason) from e
+            if not forced:
+                await self._drop_reservation(card_id, card.owner_id, spend)
+                raise GameError("forbidden", reason=e.reason) from e
+            draft = fallback_draft(card.word)
 
+        first_word = creator_user is not None and creator_user.words_created == 0
+        if rarities is None and first_word and self.settings.first_word_rare:
+            rarities = FIRST_WORD_RARITIES  # первое слово — сразу маленькая победа
         try:
             rng = random.Random()
             rarity = rules.roll_rarity(rng, lord, rarities)
             atk, def_, hp = rules.make_stats(draft.atk, draft.def_, draft.hp, rarity, rng)
-            art = await self.draw_art(draft.art, lord)
+            art = await self.draw_art(draft.art, lord, rarity, draft.element)
             now = utcnow()
             async with self.db.begin() as s:
                 await s.execute(
@@ -381,7 +425,7 @@ class GameService:
             if not await self.spend_crystals(s, user_id, price):
                 raise NotEnoughCrystals(price)
             creator = await self._creator_name(s, card)
-        art = await self.draw_art(card.art_prompt, lord)
+        art = await self.draw_art(card.art_prompt, lord, card.rarity, card.element)
         if art is None:
             async with self.db.begin() as s:
                 await self.add_crystals(s, user_id, price)
@@ -397,10 +441,36 @@ class GameService:
             await s.execute(update(Card).where(Card.id == card_id).values(file_id=file_id))
 
     async def cleanup_stale(self) -> None:
-        """Delete reservations "stuck" due to a crash in the middle of generation."""
+        """Delete reservations "stuck" due to a crash in the middle of generation, and return paid quills."""
         async with self.db.begin() as s:
-            await s.execute(
-                delete(Card).where(Card.status == "creating", Card.created_at < utcnow() - STALE_CREATING)
+            stale = (
+                await s.scalars(
+                    select(Card).where(Card.status == "creating", Card.created_at < utcnow() - STALE_CREATING)
+                )
+            ).all()
+            for card in stale:
+                deleted = await s.execute(delete(Card).where(Card.id == card.id, Card.status == "creating"))
+                if deleted.rowcount == 1:
+                    await self.add_crystals(s, card.owner_id, card.quill_paid)
+
+    async def delete_card(self, word: str) -> Card | None:
+        """Moderation: delete the card, return the frozen crystals to buyers — the word is free again."""
+        async with self.db.begin() as s:
+            card = await s.scalar(select(Card).where(Card.word == word))
+            if card is None:
+                return None
+            await self._cancel_offers(s, card.id)
+            await s.delete(card)
+        return card
+
+    async def recent_cards(self, limit: int = 20) -> list[Card]:
+        async with self.db.session() as s:
+            return list(
+                (
+                    await s.scalars(
+                        select(Card).where(Card.status == "active").order_by(Card.created_at.desc()).limit(limit)
+                    )
+                ).all()
             )
 
     # ---------- коллекция и топы ----------
@@ -427,6 +497,9 @@ class GameService:
         return list(cards), int(count), int(total)
 
     async def top_lords(self, limit: int = 10) -> list[tuple[User, int, int]]:
+        return await self._cached(f"lords{limit}", lambda: self._top_lords(limit))  # type: ignore[no-any-return]
+
+    async def _top_lords(self, limit: int) -> list[tuple[User, int, int]]:
         async with self.db.session() as s:
             total = func.sum(Card.value).label("total")
             rows = (
@@ -438,32 +511,51 @@ class GameService:
                     .limit(limit)
                 )
             ).all()
-            users = {u.id: u for u in (await s.scalars(select(User).where(User.id.in_([r[0] for r in rows])))).all()}
+            ids = [r[0] for r in rows]
+            users = {
+                u.id: u
+                for u in (await s.scalars(select(User).where(User.id.in_(ids), User.is_banned.is_(False)))).all()
+            }
         return [(users[r[0]], int(r[1]), int(r[2])) for r in rows if r[0] in users]
 
     async def top_cards(self, limit: int = 10) -> list[Card]:
-        async with self.db.session() as s:
-            return list(
-                (
-                    await s.scalars(
-                        select(Card).where(Card.status == "active").order_by(Card.value.desc(), Card.wins.desc()).limit(limit)
-                    )
-                ).all()
-            )
+        async def load() -> list[Card]:
+            async with self.db.session() as s:
+                query = select(Card).where(Card.status == "active").order_by(Card.value.desc(), Card.wins.desc())
+                return list((await s.scalars(query.limit(limit))).all())
+
+        return await self._cached(f"cards{limit}", load)  # type: ignore[no-any-return]
 
     async def top_fighters(self, limit: int = 10) -> list[User]:
-        async with self.db.session() as s:
-            return list(
-                (
-                    await s.scalars(
-                        select(User).where(User.wins + User.losses > 0).order_by(User.rating.desc()).limit(limit)
-                    )
-                ).all()
-            )
+        async def load() -> list[User]:
+            async with self.db.session() as s:
+                query = (
+                    select(User)
+                    .where(User.wins + User.losses > 0, User.is_banned.is_(False))
+                    .order_by(User.rating.desc())
+                )
+                return list((await s.scalars(query.limit(limit))).all())
+
+        return await self._cached(f"fighters{limit}", load)  # type: ignore[no-any-return]
+
+    async def top_week(self, limit: int = 5) -> list[User]:
+        async def load() -> list[User]:
+            async with self.db.session() as s:
+                query = (
+                    select(User)
+                    .where(User.week_points > 0, User.is_banned.is_(False))
+                    .order_by(User.week_points.desc(), User.id)
+                )
+                return list((await s.scalars(query.limit(limit))).all())
+
+        return await self._cached(f"week{limit}", load)  # type: ignore[no-any-return]
 
     async def world_size(self) -> int:
-        async with self.db.session() as s:
-            return int(await s.scalar(select(func.count(Card.id)).where(Card.status == "active")) or 0)
+        async def load() -> int:
+            async with self.db.session() as s:
+                return int(await s.scalar(select(func.count(Card.id)).where(Card.status == "active")) or 0)
+
+        return await self._cached("world", load)  # type: ignore[no-any-return]
 
     async def search(self, prefix: str, limit: int = 10) -> list[Card]:
         async with self.db.session() as s:
@@ -498,6 +590,20 @@ class GameService:
         )
         return level > before
 
+    async def capture_blocker(self, card: Card) -> GameError | None:
+        """Why this word can't be captured right now (to show before the player picks a fighter)."""
+        until = protection_until(card)
+        if until and until > utcnow():
+            return GameError("protected", until=until)
+        if self.settings.last_word_protected:
+            async with self.db.session() as s:
+                owned = await s.scalar(
+                    select(func.count(Card.id)).where(Card.owner_id == card.owner_id, Card.status == "active")
+                )
+            if (owned or 0) <= 1:
+                return GameError("last_word")
+        return None
+
     async def battle(self, user_id: int, my_card_id: int, target_card_id: int, capture: bool) -> BattleOutcome:
         now = utcnow()
         async with self.db.session() as s:
@@ -510,8 +616,8 @@ class GameService:
         if target.owner_id == user_id:
             raise GameError("own_card")
         defender_id = target.owner_id
-        if capture and (until := protection_until(target)) and until > now:
-            raise GameError("protected", until=until)
+        if capture and (blocker := await self.capture_blocker(target)):
+            raise blocker
 
         result = simulate(fighter(mine), fighter(target), random.Random())
         won = result.attacker_won
@@ -544,15 +650,26 @@ class GameService:
             d_rating = await s.scalar(select(User.rating).where(User.id == defender_id)) or 1000
             delta = rules.elo(a_rating, d_rating) if won else rules.elo(d_rating, a_rating)
             sign = 1 if won else -1
+            # очки турнира недели = выигранный рейтинг: победы над слабыми «фейками» почти ничего не дают
             await s.execute(
                 update(User)
                 .where(User.id == user_id)
-                .values(rating=User.rating + sign * delta, wins=User.wins + int(won), losses=User.losses + int(not won))
+                .values(
+                    rating=User.rating + sign * delta,
+                    wins=User.wins + int(won),
+                    losses=User.losses + int(not won),
+                    week_points=User.week_points + (delta if won else 0),
+                )
             )
             await s.execute(
                 update(User)
                 .where(User.id == defender_id)
-                .values(rating=User.rating - sign * delta, wins=User.wins + int(not won), losses=User.losses + int(won))
+                .values(
+                    rating=User.rating - sign * delta,
+                    wins=User.wins + int(not won),
+                    losses=User.losses + int(won),
+                    week_points=User.week_points + (0 if won else delta),
+                )
             )
 
             if capture:
@@ -567,6 +684,7 @@ class GameService:
                             owned_since=now,
                             protected_until=now + timedelta(hours=self.settings.immunity_hours),
                             shield_until=None,
+                            revenge_to=defender_id,
                         )
                     )
                     captured = moved.rowcount == 1
@@ -687,6 +805,7 @@ class GameService:
                     owned_since=now,
                     protected_until=now + timedelta(hours=self.settings.immunity_hours),
                     shield_until=None,
+                    revenge_to=None,
                 )
             )
             if moved.rowcount != 1:

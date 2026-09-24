@@ -371,4 +371,17 @@ class PaymentService:
                 if until:
                     new_until = until - timedelta(days=product.premium_days)
                     await repo.set_fields(s, payment.user_id, premium_until=new_until if new_until > now else None)
-        return f"✅ Возвращено {payment.amount} ⭐ пользователю {payment.user_id}."
+            sub_charge = await s.scalar(select(User.sub_charge_id).where(User.id == payment.user_id))
+        note = ""
+        if product and product.subscription and sub_charge:
+            # деньги вернули — автопродление больше не нужно
+            try:
+                await bot.edit_user_star_subscription(
+                    user_id=payment.user_id, telegram_payment_charge_id=sub_charge, is_canceled=True
+                )
+                async with self.db.begin() as s:
+                    await repo.set_fields(s, payment.user_id, sub_canceled=True)
+                note = " Автопродление отключено."
+            except TelegramAPIError as e:
+                note = f" Автопродление отключить не удалось: {e}"
+        return f"✅ Возвращено {payment.amount} ⭐ пользователю {payment.user_id}.{note}"

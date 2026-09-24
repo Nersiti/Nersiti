@@ -21,6 +21,7 @@ from app.game.service import GameError
 from app.game.words import display_form, normalize
 from app.services.channels import parse_channels
 from app.services.growth import announce, bot_link, run_broadcast
+from app.services.health import health_report
 from app.services.kv import AD_TEXT, REQUIRED_CHANNELS
 from app.utils import esc, fmt_dt, sanitize_tag, utcnow
 
@@ -235,8 +236,8 @@ async def cmd_setad(message: Message, command: CommandObject, ctx: Services) -> 
     if not command.args:
         current = await ctx.kv.get(AD_TEXT)
         await message.answer(
-            "Реклама показывается бесплатным пользователям каждые "
-            f"{ctx.settings.ad_every} ответов.\n\nТекущая: {current or 'нет'}\n\n"
+            "Реклама показывается игрокам без статуса Лорда каждые "
+            f"{ctx.settings.ad_every} боёв.\n\nТекущая: {current or 'нет'}\n\n"
             "Установить: <code>/setad текст с &lt;b&gt;HTML&lt;/b&gt;</code>\nВыключить: <code>/setad off</code>"
         )
         return
@@ -281,13 +282,39 @@ async def cmd_delcard(message: Message, command: CommandObject, ctx: Services) -
     if not word:
         await message.answer("Использование: <code>/delcard слово</code>")
         return
-    async with ctx.db.begin() as s:
-        card = await s.scalar(select(Card).where(Card.word == word))
-        if card is None:
-            await message.answer("Такого слова нет.")
-            return
-        await s.delete(card)
+    card = await ctx.game.delete_card(word)
+    if card is None:
+        await message.answer("Такого слова нет.")
+        return
     await message.answer(f"🗑 Карта «{esc(card.display)}» удалена, слово снова свободно.")
+
+
+@router.callback_query(kb.AdminCardCb.filter())
+async def cb_admin_delete(callback: CallbackQuery, callback_data: kb.AdminCardCb, ctx: Services) -> None:
+    async with ctx.db.session() as s:
+        word = await s.scalar(select(Card.word).where(Card.id == callback_data.id))
+    card = await ctx.game.delete_card(word) if word else None
+    await callback.answer("🗑 Удалено" if card else "Карты уже нет")
+    if card:
+        await callback.message.edit_text(f"🗑 Карта №{card.id} «{esc(card.display)}» удалена.")  # type: ignore[union-attr]
+
+
+@router.message(Command("recent"))
+async def cmd_recent(message: Message, ctx: Services) -> None:
+    cards = await ctx.game.recent_cards()
+    if not cards:
+        await message.answer("Слов пока нет.")
+        return
+    lines = [
+        f"№{c.id} «{esc(c.display)}» — {esc(c.name)} · владелец <code>{c.owner_id}</code>" for c in cards
+    ]
+    await message.answer("🆕 <b>Последние слова</b>\n\n" + "\n".join(lines) + "\n\nУдалить: <code>/delcard слово</code>")
+
+
+@router.message(Command("health"))
+async def cmd_health(message: Message, ctx: Services) -> None:
+    await message.answer("🩺 Проверяю…")
+    await message.answer(await health_report(ctx.settings, ctx.payments.methods()))
 
 
 @router.message(Command("auction_start"))

@@ -21,6 +21,7 @@ from app.context import Services
 from app.db.models import User
 from app.game.service import public_name
 from app.game.words import display_form, is_reserved, normalize
+from app.handlers.game import top_text
 from app.services.growth import bot_link
 from app.utils import esc
 
@@ -97,9 +98,16 @@ async def group_card(message: Message, command: CommandObject, ctx: Services, bo
 
 @group_router.message(Command("top"))
 async def group_top(message: Message, ctx: Services, bot: Bot) -> None:
-    game = ctx.game
+    link = await bot_link(bot, "src_group")
+    await message.reply(await top_text(ctx), reply_markup=kb.url_kb("✒️ Захватить своё слово", link))
+
+
+@group_router.message(Command("start", "help"))
+async def group_start(message: Message, bot: Bot) -> None:
     link = await bot_link(bot, "src_group")
     await message.reply(
-        texts.top(await game.top_lords(), await game.top_cards(), await game.top_fighters(), await game.world_size()),
+        "👑 <b>Хозяин Слова</b> — игра, где можно навсегда завладеть любым словом.\n\n"
+        "В чате работают <code>/card слово</code> (кто владеет словом) и <code>/top</code>.\n"
+        "Играть — в личке с ботом 👇",
         reply_markup=kb.url_kb("✒️ Захватить своё слово", link),
     )

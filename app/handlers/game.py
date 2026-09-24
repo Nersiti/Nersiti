@@ -15,13 +15,14 @@ from app import keyboards as kb
 from app import texts
 from app.context import Services
 from app.db import repo
-from app.db.models import Card, User
+from app.db.models import Card, Offer, User
 from app.game.auction import min_next_bid
 from app.game.service import REDRAW_PRICE, GameError, is_lord, public_name
 from app.game.words import display_form, normalize
 from app.services.growth import announce, notify, reward_inviter
 from app.services.kv import AD_TEXT
 from app.services.moderation import is_prompt_allowed
+from app.utils import fmt_dt
 
 log = logging.getLogger(__name__)
 router = Router(name="game")
@@ -35,9 +36,27 @@ async def _owner(ctx: Services, card: Card) -> User | None:
         return await repo.get_user(s, card.owner_id)
 
 
+async def capture_lock(card: Card, viewer_id: int, ctx: Services) -> str | None:
+    """Button label when the word can't be captured right now."""
+    if card.owner_id == viewer_id:
+        return None
+    blocker = await ctx.game.capture_blocker(card)
+    if blocker is None:
+        return None
+    if blocker.code == "last_word":
+        return "Последнее слово игрока"
+    until = blocker.data.get("until")
+    return f"Защищено до {fmt_dt(until, ctx.settings.tz)}" if until else "Под защитой"  # type: ignore[arg-type]
+
+
+async def card_markup(card: Card, viewer_id: int, ctx: Services) -> kb.InlineKeyboardMarkup:
+    lock = await capture_lock(card, viewer_id, ctx)
+    return kb.card_kb(card, viewer_id, ctx.game.shield_price(card), REDRAW_PRICE, lock)
+
+
 async def send_card(bot: Bot, chat_id: int, card: Card, viewer_id: int, ctx: Services) -> None:
     caption = texts.card_caption(card, await _owner(ctx, card), ctx.settings, viewer_id)
-    markup = kb.card_kb(card, viewer_id, ctx.game.shield_price(card), REDRAW_PRICE)
+    markup = await card_markup(card, viewer_id, ctx)
     if card.file_id:
         try:
             await bot.send_photo(chat_id, card.file_id, caption=caption, reply_markup=markup)
@@ -109,13 +128,23 @@ async def cb_page(callback: CallbackQuery, callback_data: kb.PageCb, user: User,
     await _show_collection(bot, msg.chat.id, user, ctx, max(0, callback_data.page), msg)  # type: ignore[union-attr, arg-type]
 
 
+async def top_text(ctx: Services) -> str:
+    game = ctx.game
+    week = await game.top_week() if ctx.settings.tournament_enabled else []
+    return texts.top(
+        await game.top_lords(),
+        await game.top_cards(),
+        await game.top_fighters(),
+        await game.world_size(),
+        week,
+        ctx.settings.tournament_prizes,
+    )
+
+
 @router.message(Command("top"))
 @router.message(F.text == kb.BTN_TOP)
 async def menu_top(message: Message, ctx: Services) -> None:
-    game = ctx.game
-    await message.answer(
-        texts.top(await game.top_lords(), await game.top_cards(), await game.top_fighters(), await game.world_size())
-    )
+    await message.answer(await top_text(ctx))
 
 
 @router.message(Command("profile", "me"))
@@ -129,14 +158,24 @@ async def menu_profile(message: Message, user: User, ctx: Services) -> None:
     )
 
 
-@router.message(Command("arena"))
-@router.message(F.text == kb.BTN_ARENA)
-async def menu_arena(message: Message, user: User, ctx: Services) -> None:
+async def show_arena(bot: Bot, chat_id: int, user: User, ctx: Services) -> None:
     cards, _, _ = await ctx.game.user_cards(user.id, 0, kb.PAGE_SIZE)
     if not cards:
-        await message.answer(texts.NEED_CARD)
+        await bot.send_message(chat_id, texts.NEED_CARD)
         return
-    await message.answer(texts.ARENA, reply_markup=kb.arena_kb(cards))
+    await bot.send_message(chat_id, texts.ARENA, reply_markup=kb.arena_kb(cards))
+
+
+@router.message(Command("arena"))
+@router.message(F.text == kb.BTN_ARENA)
+async def menu_arena(message: Message, user: User, ctx: Services, bot: Bot) -> None:
+    await show_arena(bot, message.chat.id, user, ctx)
+
+
+@router.callback_query(kb.MenuCb.filter(F.action == "arena"))
+async def cb_menu_arena(callback: CallbackQuery, user: User, ctx: Services, bot: Bot) -> None:
+    await callback.answer()
+    await show_arena(bot, callback.message.chat.id, user, ctx)  # type: ignore[union-attr]
 
 
 # ---------- захват слова ----------
@@ -166,22 +205,23 @@ async def on_word(message: Message, user: User, ctx: Services, bot: Bot) -> None
         return
     quills, _ = ctx.game.used_today(user)
     left = max(0, ctx.game.daily_limit("quill", is_lord(user)) - quills)
-    token = ctx.tokens.put(f"{word}\n{display}")
     price = ctx.settings.quill_price
-    await message.answer(texts.word_free(display, left, price), reply_markup=kb.claim_kb(token, 0 if left else price))
+    value = kb.claim_value(display, ctx.tokens.put)
+    await message.answer(texts.word_free(display, left, price), reply_markup=kb.claim_kb(value, 0 if left else price))
 
 
 @router.callback_query(kb.ClaimCb.filter())
 async def cb_claim(callback: CallbackQuery, callback_data: kb.ClaimCb, user: User, ctx: Services, bot: Bot) -> None:
-    stored = ctx.tokens.get(callback_data.token)
-    if stored is None:
+    value = callback_data.w
+    display = ctx.tokens.get(value[1:]) if value.startswith("~") else value
+    word = normalize(display) if display else None
+    if display is None or word is None:
         await callback.answer("Запрос устарел — напиши слово ещё раз.", show_alert=True)
         return
     if user.id in ctx.busy:
         await callback.answer(texts.BUSY, show_alert=True)
         return
     chat_id = callback.message.chat.id  # type: ignore[union-attr]
-    word, display = stored.split("\n", 1)
     if not await _gate(bot, chat_id, user, ctx):
         await callback.answer()
         return
@@ -197,6 +237,7 @@ async def cb_claim(callback: CallbackQuery, callback_data: kb.ClaimCb, user: Use
     except TelegramAPIError:
         pass
 
+    first_word = user.words_created == 0
     ctx.busy.add(user.id)
     try:
         status = await bot.send_message(chat_id, texts.creating(display, ctx.gen.load))
@@ -214,7 +255,7 @@ async def cb_claim(callback: CallbackQuery, callback_data: kb.ClaimCb, user: Use
             chat_id,
             BufferedInputFile(created.image, f"card_{card.id}.jpg"),
             caption=texts.card_caption(card, user, ctx.settings, user.id),
-            reply_markup=kb.card_kb(card, user.id, ctx.game.shield_price(card), REDRAW_PRICE),
+            reply_markup=await card_markup(card, user.id, ctx),
         )
         await _store_photo(ctx, card.id, sent)
         try:
@@ -222,6 +263,8 @@ async def cb_claim(callback: CallbackQuery, callback_data: kb.ClaimCb, user: Use
         except TelegramAPIError:
             pass
         await bot.send_message(chat_id, texts.created(card))
+        if first_word:
+            await bot.send_message(chat_id, texts.FIRST_CARD_TIPS, reply_markup=kb.first_card_kb())
         await reward_inviter(bot, ctx, user)
         if card.rarity in ("legendary", "mythic") and sent.photo:
             await announce(bot, ctx, texts.news_new_card(card, public_name(user)), sent.photo[-1].file_id)
@@ -249,12 +292,20 @@ async def cb_card(callback: CallbackQuery, callback_data: kb.CardCb, user: User,
         if card.owner_id == user.id:
             await callback.answer(texts.ERRORS["own_card"], show_alert=True)
             return
+        capture = action == "capture"
+        if capture:
+            if blocker := await ctx.game.capture_blocker(card):
+                await callback.answer(texts.error_text(blocker, ctx.settings), show_alert=True)
+                return
+            if user.crystals < card.value:
+                await callback.answer()
+                await send_error(bot, chat_id, GameError("no_crystals", need=card.value), ctx)
+                return
         mine, _, _ = await ctx.game.user_cards(user.id, 0, kb.PAGE_SIZE)
         if not mine:
             await callback.answer(texts.NEED_CARD, show_alert=True)
             return
         await callback.answer()
-        capture = action == "capture"
         await bot.send_message(chat_id, texts.choose_fighter(card, capture), reply_markup=kb.fighters_kb(mine, card, capture))
 
     elif action == "offer":
@@ -263,6 +314,16 @@ async def cb_card(callback: CallbackQuery, callback_data: kb.CardCb, user: User,
             return
         await callback.answer()
         await bot.send_message(chat_id, texts.offer_choose(card), reply_markup=kb.offer_kb(card))
+
+    elif action == "report":
+        key = (user.id, card.id)
+        if key in ctx.reported or card.owner_id == user.id:
+            await callback.answer(texts.REPORT_DUPLICATE, show_alert=True)
+            return
+        ctx.reported.add(key)
+        for admin_id in ctx.settings.admin_ids:
+            await notify(bot, admin_id, texts.report_admin(card, public_name(user)), kb.admin_card_kb(card.id))
+        await callback.answer(texts.REPORT_SENT, show_alert=True)
 
     elif action == "shield":
         try:
@@ -286,7 +347,7 @@ async def cb_card(callback: CallbackQuery, callback_data: kb.CardCb, user: User,
                 chat_id,
                 BufferedInputFile(created.image, f"card_{card.id}.jpg"),
                 caption=texts.card_caption(created.card, user, ctx.settings, user.id),
-                reply_markup=kb.card_kb(created.card, user.id, ctx.game.shield_price(created.card), REDRAW_PRICE),
+                reply_markup=await card_markup(created.card, user.id, ctx),
             )
             await _store_photo(ctx, card.id, sent)
         except GameError as e:
@@ -375,9 +436,14 @@ async def cb_offer(callback: CallbackQuery, callback_data: kb.OfferCb, user: Use
         await callback.answer()
         await send_error(bot, chat_id, e, ctx)
         return
-    card = await ctx.game.get_card(offer.card_id)
-    assert card is not None
     await callback.answer("📨")
+    await _deliver_offer(bot, chat_id, user, offer, ctx)
+
+
+async def _deliver_offer(bot: Bot, chat_id: int, user: User, offer: Offer, ctx: Services) -> None:
+    card = await ctx.game.get_card(offer.card_id)
+    if card is None:
+        return
     await bot.send_message(chat_id, texts.offer_sent(card, offer.price))
     await notify(
         bot, offer.seller_id, texts.offer_received(card, offer.price, public_name(user)), kb.offer_reply_kb(offer.id)
@@ -400,7 +466,7 @@ async def cb_offer_reply(
     await callback.answer()
 
     if not callback_data.accept:
-        await msg.edit_text("❌ Ты отказался от сделки.")  # type: ignore[union-attr]
+        await msg.edit_text("❌ Сделка отклонена.")  # type: ignore[union-attr]
         await notify(bot, declined.buyer_id, texts.offer_declined(declined.price))
         return
     if not result.ok or result.card is None:
@@ -411,6 +477,21 @@ async def cb_offer_reply(
     await notify(bot, result.offer.buyer_id, texts.offer_accepted_buyer(result.card))
     for other in result.canceled or []:
         await notify(bot, other.buyer_id, texts.OFFER_CANCELED)
+
+
+@router.message(Command("offer"))
+async def cmd_offer(message: Message, command: CommandObject, user: User, ctx: Services, bot: Bot) -> None:
+    args = (command.args or "").replace("№", "").split()
+    if len(args) != 2 or not all(a.isdigit() for a in args):
+        await message.answer("Своя цена за слово: <code>/offer номер_карты цена</code>, например <code>/offer 12 500</code>")
+        return
+    card_id, price = int(args[0]), int(args[1])
+    try:
+        offer = await ctx.game.make_offer(user.id, card_id, price)
+    except GameError as e:
+        await send_error(bot, message.chat.id, e, ctx)
+        return
+    await _deliver_offer(bot, message.chat.id, user, offer, ctx)
 
 
 # ---------- аукцион ----------

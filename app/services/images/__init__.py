@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from app.config import Settings
-from app.services.images.base import RATIOS, STYLES, ImageBackend, ImageError, ImageRequest, build_request
+from app.services.images.base import RATIOS, ImageBackend, ImageError, ImageRequest, build_request
 
-__all__ = ["RATIOS", "STYLES", "ImageBackend", "ImageError", "ImageRequest", "build_request", "create_image_backend"]
+__all__ = ["RATIOS", "ImageBackend", "ImageError", "ImageRequest", "build_request", "create_image_backend"]
 
 
 def create_image_backend(settings: Settings) -> ImageBackend:

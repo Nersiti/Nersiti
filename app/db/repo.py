@@ -181,6 +181,7 @@ class Stats:
     cards_total: int
     cards_today: int
     battles_today: int
+    crystals_total: int
     payments_today: int
     stars_today: int
     rub_today: int
@@ -213,6 +214,7 @@ async def collect_stats(s: AsyncSession, tz: ZoneInfo) -> Stats:
             select(func.count(Card.id)).where(Card.status == "active", Card.created_at >= day_start)
         ),
         battles_today=await count(select(func.count(Battle.id)).where(Battle.created_at >= day_start)),
+        crystals_total=await count(select(func.sum(User.crystals))),
         payments_today=await count(
             select(func.count()).select_from(Payment).where(ok_payments, Payment.paid_at >= day_start)
         ),
