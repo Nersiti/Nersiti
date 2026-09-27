@@ -4,12 +4,14 @@ from contextlib import asynccontextmanager
 
 from aiogram.types import Update
 from fastapi import FastAPI, Header, HTTPException, Request
+from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
 from app.api import build_api_router
 from app.bot.instance import get_bot, get_dispatcher
 from app.config import get_settings
 from app.db import dispose_engine, get_sessionmaker
+from app.game.errors import GameError
 from app.redis_client import close_redis, get_redis
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -27,6 +29,11 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="World Battle", lifespan=lifespan, docs_url=None, redoc_url=None)
 app.include_router(build_api_router(), prefix="/api")
+
+
+@app.exception_handler(GameError)
+async def game_error_handler(request: Request, exc: GameError) -> JSONResponse:
+    return JSONResponse(status_code=exc.status, content={"detail": exc.code})
 
 
 @app.get("/api/health")

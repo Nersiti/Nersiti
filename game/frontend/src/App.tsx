@@ -1,15 +1,36 @@
 import { useEffect } from "react";
 
+import BottomNav from "./components/BottomNav";
+import Toast from "./components/Toast";
 import { t } from "./i18n";
+import Hq from "./screens/Hq";
 import Onboarding from "./screens/Onboarding";
+import Soon from "./screens/Soon";
+import Upgrades from "./screens/Upgrades";
 import { useStore } from "./store";
 
+const TAP_FLUSH_INTERVAL_MS = 10_000;
+
 export default function App() {
-  const { status, error, state, load } = useStore();
+  const { status, error, state, load, tab } = useStore();
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  // Send accumulated taps every 10s and when the app goes to the background.
+  useEffect(() => {
+    const flush = (keepalive = false) => void useStore.getState().flushTaps(keepalive);
+    const id = setInterval(() => flush(), TAP_FLUSH_INTERVAL_MS);
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") flush(true);
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, []);
 
   if (status === "loading") {
     return <div className="center-screen">{t("app.loading")}</div>;
@@ -30,10 +51,16 @@ export default function App() {
   if (!state.onboarded) return <Onboarding />;
 
   return (
-    <div className="center-screen">
-      <h1>{t("app.title")}</h1>
-      <p>{t("hello", { name: state.user.first_name })}</p>
-      <p>📍 {state.city?.name}</p>
+    <div className="app">
+      <main className="app-main">
+        {tab === "hq" && <Hq />}
+        {tab === "upgrades" && <Upgrades />}
+        {tab === "map" && <Soon icon="🗺️" />}
+        {tab === "clan" && <Soon icon="⚔️" />}
+        {tab === "more" && <Soon icon="☰" />}
+      </main>
+      <BottomNav />
+      <Toast />
     </div>
   );
 }

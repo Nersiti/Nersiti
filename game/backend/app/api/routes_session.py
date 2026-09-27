@@ -31,6 +31,13 @@ async def create_session(
     if user.banned:
         await session.commit()
         raise HTTPException(status_code=403, detail="banned")
-    state = await build_state(session, user)
+    now = player_service.utcnow()
+    offline_earned = player_service.sync_user(user, now)
+    state = await build_state(session, user, now)
     await session.commit()
-    return {"created": created, "state": state, "config": build_config()}
+    return {
+        "created": created,
+        "offline_earned": offline_earned,
+        "state": state,
+        "config": build_config(),
+    }

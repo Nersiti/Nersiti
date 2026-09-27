@@ -25,8 +25,12 @@ function authHeader(): string {
   return "";
 }
 
-export async function api<T>(path: string, options: { method?: string; body?: unknown } = {}): Promise<T> {
+export async function api<T>(
+  path: string,
+  options: { method?: string; body?: unknown; keepalive?: boolean } = {},
+): Promise<T> {
   const res = await fetch(`/api${path}`, {
+    keepalive: options.keepalive,
     method: options.method ?? (options.body === undefined ? "GET" : "POST"),
     headers: {
       Authorization: authHeader(),
