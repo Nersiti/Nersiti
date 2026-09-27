@@ -139,7 +139,8 @@ async def cmd_tasks(message: Message) -> None:
         await message.answer(t(lang, "admin.task.none"))
         return
     lines = [
-        f"#{x.id} [{x.status}] {x.title_ru} — {x.completions}/{x.max_completions or '∞'}, "
+        f"#{x.id} [{x.status}] {html.escape(x.title_ru)} — "
+        f"{x.completions}/{x.max_completions or '∞'}, "
         f"+{x.reward}"
         for x in tasks
     ]

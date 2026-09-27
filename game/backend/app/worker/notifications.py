@@ -95,7 +95,7 @@ class Sender:
 
 
 def _cities_text(city_ids: list[int], cities: dict[int, City], lang: str) -> str:
-    names = [world_service.city_name(cities[c], lang) for c in city_ids if c in cities]
+    names = [html.escape(world_service.city_name(cities[c], lang)) for c in city_ids if c in cities]
     text = ", ".join(names[:MAX_CITIES_IN_TEXT])
     return f"{text}…" if len(names) > MAX_CITIES_IN_TEXT else text
 
