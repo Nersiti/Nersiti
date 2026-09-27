@@ -4,6 +4,7 @@ APScheduler==3.11.3
 asyncpg==0.31.0
 babel==2.18.0
 fastapi==0.141.1
+geonamescache==3.0.2
 h3==4.5.0
 pillow==12.3.0
 pydantic==2.13.5

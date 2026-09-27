@@ -83,6 +83,10 @@ async def _clean_state(_schema) -> None:
         await conn.execute(text(f"TRUNCATE {tables} RESTART IDENTITY CASCADE"))
     await get_redis().flushdb()
 
+    from app.game import world_service
+
+    world_service.reset_cache()
+
 
 @pytest.fixture
 async def db():

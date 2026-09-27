@@ -43,3 +43,32 @@ async def login(client, user_id: int, **kwargs) -> dict:
     res = await client.post("/api/session", json=body, headers=auth(user_id, **kwargs))
     assert res.status_code == 200, res.text
     return res.json()
+
+
+async def seed_world(db) -> dict[str, int]:
+    """Inserts a tiny world: Moscow (capital), Kazan, Khimki and a Turkish Kazan."""
+    from app.game import world_service
+    from app.game.world import CityIn, generate_sectors
+    from app.models import City, Sector
+
+    cities = [
+        CityIn(524901, "Moscow", "Москва", "RU", 55.75204, 37.61781, 10381222, True, "48"),
+        CityIn(551487, "Kazan", "Казань", "RU", 55.78874, 49.12214, 1243500, False, "73"),
+        CityIn(550280, "Khimki", "Химки", "RU", 55.9001, 37.42848, 239967, False, "47"),
+        CityIn(743615, "Kazan", "Казан", "TR", 40.23167, 32.68389, 23889, False, "68"),
+    ]
+    kept, sectors = generate_sectors(cities)
+    for c in kept:
+        db.add(
+            City(
+                id=c.id, name_en=c.name_en, name_ru=c.name_ru, country_code=c.country_code,
+                lat=c.lat, lng=c.lng, population=c.population, is_capital=c.is_capital,
+                sectors_count=c.sectors_count,
+            )
+        )  # fmt: skip
+    await db.flush()
+    for s in sectors:
+        db.add(Sector(h3=s.h3, city_id=s.city_id, lat=s.lat, lng=s.lng, value=s.value))
+    await db.commit()
+    world_service.reset_cache()
+    return {"moscow": 524901, "kazan": 551487, "khimki": 550280, "kazan_tr": 743615}

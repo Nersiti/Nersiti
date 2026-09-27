@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 
 import { t } from "./i18n";
+import Onboarding from "./screens/Onboarding";
 import { useStore } from "./store";
 
 export default function App() {
@@ -26,10 +27,13 @@ export default function App() {
     );
   }
 
+  if (!state.onboarded) return <Onboarding />;
+
   return (
     <div className="center-screen">
       <h1>{t("app.title")}</h1>
       <p>{t("hello", { name: state.user.first_name })}</p>
+      <p>📍 {state.city?.name}</p>
     </div>
   );
 }

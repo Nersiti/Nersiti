@@ -74,3 +74,135 @@ button {
 .btn:disabled {
   opacity: 0.5;
 }
+
+.btn-secondary {
+  background: var(--bg2);
+  color: var(--text);
+}
+
+.hint {
+  color: var(--hint);
+  font-size: 13px;
+}
+
+.error-text {
+  color: var(--danger);
+  font-size: 13px;
+}
+
+.grow {
+  flex: 1;
+}
+
+.input {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  border: 1px solid transparent;
+  background: var(--bg2);
+  color: var(--text);
+  font: inherit;
+  outline: none;
+  user-select: text;
+}
+
+.input:focus {
+  border-color: var(--accent);
+}
+
+.list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+}
+
+.list-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--bg2);
+  text-align: left;
+}
+
+.list-item.selected {
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.flag {
+  font-size: 20px;
+}
+
+/* Onboarding */
+.onb {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px 16px calc(16px + env(safe-area-inset-bottom));
+}
+
+.onb h2 {
+  margin: 0;
+  font-size: 22px;
+}
+
+.onb .hint {
+  margin: 0;
+}
+
+.onb-slide {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 12px;
+}
+
+.onb-slide p {
+  margin: 0;
+  color: var(--hint);
+  max-width: 320px;
+  line-height: 1.45;
+}
+
+.onb-slide .onb-city {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.onb-icon {
+  font-size: 72px;
+}
+
+.onb-dots {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+}
+
+.onb-dots span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--bg2);
+}
+
+.onb-dots span.active {
+  background: var(--accent);
+}
+
+.onb-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.onb-actions .btn {
+  flex: 1;
+}
