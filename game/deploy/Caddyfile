@@ -8,8 +8,11 @@
 
 	handle {
 		root * /srv/frontend
-		header /assets/* Cache-Control "public, max-age=31536000, immutable"
-		header /index.html Cache-Control "no-cache"
+		# Hashed build assets never change; the HTML must always be revalidated.
+		@assets path /assets/*
+		header @assets Cache-Control "public, max-age=31536000, immutable"
+		@html path / /index.html
+		header @html Cache-Control "no-cache"
 		try_files {path} /index.html
 		file_server
 	}

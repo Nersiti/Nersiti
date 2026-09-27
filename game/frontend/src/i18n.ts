@@ -226,6 +226,17 @@ const ru = {
   "share.me": "Позвать в игру",
   "share.clan": "Позвать в клан",
 
+  "err.network": "Нет связи с сервером. Проверь интернет и попробуй ещё раз",
+  "err.too_many_requests": "Слишком часто — подожди пару секунд",
+  "err.http_500": "Ошибка сервера. Попробуй чуть позже",
+  "err.http_502": "Сервер перезапускается. Попробуй через минуту",
+  "err.unauthorized": "Открой игру через Telegram-бота",
+  "err.no_session": "Сессия устарела — перезапусти игру",
+  "err.banned": "Аккаунт заблокирован",
+  "err.not_enough_coins": "Не хватает монет",
+  "err.onboarding_required": "Сначала выбери город",
+  "err.generic": "Что-то пошло не так",
+
   "profile.notify": "Уведомления о боях",
   "profile.notify.hint": "Бот напишет, когда захватят твои секторы или заполнится хранилище",
 
@@ -491,6 +502,17 @@ const en: Record<I18nKey, string> = {
   "share.me": "Invite to the game",
   "share.clan": "Invite to the clan",
 
+  "err.network": "No connection to the server. Check your internet and try again",
+  "err.too_many_requests": "Too fast — wait a couple of seconds",
+  "err.http_500": "Server error. Try again a bit later",
+  "err.http_502": "The server is restarting. Try again in a minute",
+  "err.unauthorized": "Open the game through the Telegram bot",
+  "err.no_session": "Session expired — restart the game",
+  "err.banned": "Account blocked",
+  "err.not_enough_coins": "Not enough coins",
+  "err.onboarding_required": "Pick your city first",
+  "err.generic": "Something went wrong",
+
   "profile.notify": "Battle notifications",
   "profile.notify.hint": "The bot messages you when your sectors are captured or storage is full",
 
@@ -572,4 +594,14 @@ export function formatDuration(seconds: number): string {
   const h = Math.floor((s % 86400) / 3600);
   const m = Math.floor((s % 3600) / 60);
   return d > 0 ? t("time.dh", { d, h }) : t("time.hm", { h, m });
+}
+
+/** Human-readable text for an API error code. Tries `<prefix>.<code>`, then `err.<code>`. */
+export function errorText(code: string, prefix?: string): string {
+  for (const key of [prefix ? `${prefix}.${code}` : null, `err.${code}`]) {
+    if (!key) continue;
+    const text = t(key as I18nKey);
+    if (text !== key) return text;
+  }
+  return t("err.generic");
 }

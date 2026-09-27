@@ -1,7 +1,7 @@
 import { useState } from "react";
 
 import { api, ApiError } from "../api";
-import { compactNumber, t, type I18nKey } from "../i18n";
+import { compactNumber, errorText, t, type I18nKey } from "../i18n";
 import { useStore } from "../store";
 import { haptic, openTgLink } from "../tg";
 import type { ClanSummary, PlayerState } from "../types";
@@ -59,7 +59,7 @@ export function JoinClanButton(props: { clan: ClanSummary; onJoined?: () => void
       haptic("error");
       const code = e instanceof ApiError ? e.code : "network";
       if (code === "subscribe_required") setNeedSub(true);
-      toast(t(`clan.err.${code}` as I18nKey), "error");
+      toast(errorText(code, "clan.err"), "error");
     } finally {
       setBusy(false);
     }

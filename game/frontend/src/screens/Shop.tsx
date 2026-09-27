@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { api } from "../api";
 import Sheet from "../components/Sheet";
-import { toast } from "../components/Toast";
+import { toast, toastError } from "../components/Toast";
 import { compactNumber, getLang, t, type I18nKey } from "../i18n";
 import { purchase } from "../shop";
 import { useStore } from "../store";
@@ -28,7 +28,7 @@ export default function Shop() {
   const reload = useCallback(() => {
     api<ShopInfo>("/shop")
       .then(setInfo)
-      .catch(() => toast("network", "error"));
+      .catch(() => toastError(null));
   }, []);
 
   useEffect(reload, [reload]);

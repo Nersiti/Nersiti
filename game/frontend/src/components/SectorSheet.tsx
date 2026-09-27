@@ -1,15 +1,15 @@
 import { useCallback, useEffect, useState } from "react";
 
-import { api, ApiError } from "../api";
+import { api } from "../api";
 import { useLiveBalance } from "../hooks";
 import { compactNumber, formatNumber, getLang, t, type I18nKey } from "../i18n";
-import { purchase, shopErrorText } from "../shop";
+import { purchase } from "../shop";
 import { useStore, withFlushedTaps } from "../store";
 import { haptic } from "../tg";
 import type { PlayerState, SectorActionResult, SectorDetails } from "../types";
 import { ClanEmblem } from "./ClanParts";
 import Sheet from "./Sheet";
-import { toast } from "./Toast";
+import { toast, toastError } from "./Toast";
 
 const SHARES = [0.1, 0.25, 0.5, 1];
 
@@ -26,7 +26,7 @@ export default function SectorSheet(props: { h3: string | null; onClose: () => v
 
   useEffect(() => {
     setSector(null);
-    if (props.h3) void load(props.h3).catch(() => toast("network", "error"));
+    if (props.h3) void load(props.h3).catch(() => toastError(null));
   }, [props.h3, load]);
 
   const amount = Math.max(0, Math.floor(coins * share));
@@ -50,10 +50,7 @@ export default function SectorSheet(props: { h3: string | null; onClose: () => v
       await load(sector.h3);
     } catch (e) {
       haptic("error");
-      const code = e instanceof ApiError ? e.code : "network";
-      const key = `sector.err.${code}` as I18nKey;
-      const text = t(key);
-      toast(text === key ? code : text, "error");
+      toastError(e, "sector.err");
     } finally {
       setBusy(false);
     }
@@ -223,7 +220,7 @@ function ShieldActions(props: { sector: SectorDetails; onDone: () => void }) {
       props.onDone();
     } catch (e) {
       haptic("error");
-      toast(shopErrorText(e instanceof ApiError ? e.code : "network"), "error");
+      toastError(e, "shop.err");
     } finally {
       setBusy(false);
     }

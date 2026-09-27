@@ -24,8 +24,9 @@ def get_engine() -> AsyncEngine:
     if _engine is None:
         _engine = create_async_engine(
             get_settings().database_url,
-            pool_size=10,
-            max_overflow=20,
+            # Keep connections open under load instead of churning overflow ones.
+            pool_size=20,
+            max_overflow=10,
             pool_pre_ping=True,
         )
     return _engine

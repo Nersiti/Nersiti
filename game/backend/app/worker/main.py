@@ -38,9 +38,21 @@ def build_scheduler() -> AsyncIOScheduler:
     return scheduler
 
 
+async def wait_for_database(attempts: int = 60, delay: float = 3.0) -> None:
+    """The API container runs migrations on start; wait until the schema is there."""
+    for attempt in range(1, attempts + 1):
+        try:
+            await jobs.season_check()  # also makes sure a season exists
+            return
+        except Exception as exc:  # noqa: BLE001 - any DB error means "not ready yet"
+            log.info("database not ready (%s/%s): %s", attempt, attempts, exc)
+            await asyncio.sleep(delay)
+    raise RuntimeError("database is not ready")
+
+
 async def main() -> None:
     get_settings()
-    await jobs.season_check()  # make sure a season exists before players arrive
+    await wait_for_database()
     scheduler = build_scheduler()
     scheduler.start()
     log.info("worker started")

@@ -5,7 +5,7 @@ import { t } from "../i18n";
 import { useStore } from "../store";
 import { haptic, shareLink, webApp } from "../tg";
 import Sheet from "./Sheet";
-import { toast } from "./Toast";
+import { toast, toastError } from "./Toast";
 
 interface Links {
   story_url: string;
@@ -23,7 +23,7 @@ export default function ShareSheet(props: { kind: "me" | "clan"; open: boolean; 
     if (!props.open) return;
     api<Links>(`/share/links?kind=${props.kind}`)
       .then(setLinks)
-      .catch(() => toast("network", "error"));
+      .catch(() => toastError(null));
   }, [props.open, props.kind]);
 
   const toStory = () => {
@@ -44,7 +44,7 @@ export default function ShareSheet(props: { kind: "me" | "clan"; open: boolean; 
       const { id } = await api<{ id: string }>("/share/prepare", { body: { kind: props.kind } });
       wa.shareMessage(id);
     } catch {
-      toast("network", "error");
+      toastError(null);
     }
   };
 

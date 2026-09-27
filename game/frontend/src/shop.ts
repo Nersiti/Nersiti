@@ -1,13 +1,11 @@
 import { api, ApiError } from "./api";
 import { toast } from "./components/Toast";
-import { t, type I18nKey } from "./i18n";
+import { errorText, t } from "./i18n";
 import { useStore } from "./store";
 import { haptic, openInvoice } from "./tg";
 
-function errorText(code: string): string {
-  const key = `shop.err.${code}` as I18nKey;
-  const text = t(key);
-  return text === key ? code : text;
+function shopError(code: string): string {
+  return errorText(code, "shop.err");
 }
 
 /** Buys a shop item for Telegram Stars. Resolves true when paid. */
@@ -17,7 +15,7 @@ export async function purchase(itemId: string, param?: string): Promise<boolean>
     link = (await api<{ invoice_link: string }>("/shop/invoice", { body: { item_id: itemId, param } })).invoice_link;
   } catch (e) {
     haptic("error");
-    toast(errorText(e instanceof ApiError ? e.code : "network"), "error");
+    toast(shopError(e instanceof ApiError ? e.code : "network"), "error");
     return false;
   }
   const status = await openInvoice(link);
@@ -35,4 +33,4 @@ export async function purchase(itemId: string, param?: string): Promise<boolean>
   return false;
 }
 
-export { errorText as shopErrorText };
+export { shopError as shopErrorText };

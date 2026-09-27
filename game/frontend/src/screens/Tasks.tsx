@@ -2,17 +2,14 @@ import { useCallback, useEffect, useState } from "react";
 
 import { showRewardedAd } from "../ads";
 import { api, ApiError } from "../api";
-import { toast } from "../components/Toast";
-import { compactNumber, formatDuration, formatNumber, t, type I18nKey } from "../i18n";
+import { toast, toastError } from "../components/Toast";
+import { compactNumber, errorText, formatDuration, formatNumber, t } from "../i18n";
 import { useStore } from "../store";
 import { haptic, openTgLink, shareLink } from "../tg";
 import type { PlayerState, ReferralSummary, TaskInfo, TasksResponse } from "../types";
 
 function errText(prefix: string, e: unknown): string {
-  const code = e instanceof ApiError ? e.code : "network";
-  const key = `${prefix}.${code}` as I18nKey;
-  const text = t(key);
-  return text === key ? code : text;
+  return errorText(e instanceof ApiError ? e.code : "network", prefix);
 }
 
 export default function Tasks() {
@@ -32,7 +29,7 @@ export default function Tasks() {
   }, []);
 
   useEffect(() => {
-    void reload().catch(() => toast("network", "error"));
+    void reload().catch(() => toastError(null));
   }, [reload]);
 
   if (!data || !refs) return <div className="screen">{t("app.loading")}</div>;

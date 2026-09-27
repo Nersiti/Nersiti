@@ -2,7 +2,7 @@ import { lazy, Suspense, useEffect } from "react";
 
 import BottomNav from "./components/BottomNav";
 import Toast from "./components/Toast";
-import { t } from "./i18n";
+import { errorText, t } from "./i18n";
 import Clan, { InviteSheet } from "./screens/Clan";
 import Hq from "./screens/Hq";
 import More from "./screens/More";
@@ -44,7 +44,7 @@ export default function App() {
     return (
       <div className="center-screen">
         <h1>{t("app.error")}</h1>
-        <p>{error === "unauthorized" ? t("app.openInTelegram") : error}</p>
+        <p>{errorText(error ?? "network")}</p>
         <button className="btn" onClick={() => void load()}>
           {t("app.retry")}
         </button>

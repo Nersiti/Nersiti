@@ -1,9 +1,9 @@
 import { useRef, useState, type CSSProperties, type PointerEvent } from "react";
 
-import { api, ApiError } from "../api";
+import { api } from "../api";
 import ShareSheet from "../components/ShareSheet";
 import Sheet from "../components/Sheet";
-import { toast } from "../components/Toast";
+import { toast, toastError } from "../components/Toast";
 import { useLiveBalance, useNow } from "../hooks";
 import { compactNumber, formatDuration, formatNumber, t } from "../i18n";
 import { useStore, withFlushedTaps } from "../store";
@@ -180,7 +180,7 @@ function DailySheet(props: { open: boolean; onClose: () => void; state: PlayerSt
       setState(res.state);
       toast(`+${formatNumber(res.reward)} 🪙`, "success");
     } catch (e) {
-      toast(e instanceof ApiError ? e.code : "network", "error");
+      toastError(e);
     } finally {
       setBusy(false);
     }

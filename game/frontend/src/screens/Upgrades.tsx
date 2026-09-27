@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { api, ApiError } from "../api";
-import { toast } from "../components/Toast";
+import { toast, toastError } from "../components/Toast";
 import { useLiveBalance } from "../hooks";
 import { compactNumber, formatNumber, t, type I18nKey } from "../i18n";
 import { useStore, withFlushedTaps } from "../store";
@@ -49,7 +49,7 @@ export default function Upgrades() {
   }, []);
 
   useEffect(() => {
-    void reload().catch(() => toast("network", "error"));
+    void reload().catch(() => toastError(null));
   }, [reload]);
 
   const buy = async (card: UpgradeCard) => {

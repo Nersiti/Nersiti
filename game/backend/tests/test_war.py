@@ -270,3 +270,64 @@ async def test_concurrent_attacks_are_serialized(client, db, clock):
     assert spent == 20 * 900
     logs = (await db.execute(select(func.count()).select_from(BattleLog))).scalar_one()
     assert logs == 21
+
+
+async def test_controller_update_does_not_deadlock_with_fk_locks(db):
+    """Regression: attack transactions hold KEY SHARE on the city row (users.city_id
+    foreign key check). Recomputing the controller must not need a stronger lock that
+    conflicts with it, or two attacks in one city deadlock."""
+    from sqlalchemy import text
+
+    from app.db import get_sessionmaker
+    from app.game import war_service
+
+    ids = await seed_world(db)
+    clan_id = await channel_clan(db)
+    await db.execute(update(Sector).where(Sector.h3 == KAZAN_CENTER).values(owner_clan_id=clan_id))
+    await db.commit()
+
+    lock = text("SELECT id FROM cities WHERE id = :c FOR KEY SHARE")
+    async with get_sessionmaker()() as s1, get_sessionmaker()() as s2:
+        await s1.execute(lock, {"c": ids["kazan"]})
+        await s2.execute(lock, {"c": ids["kazan"]})
+        t1 = asyncio.create_task(war_service.recompute_city_controller(s1, ids["kazan"]))
+        await asyncio.sleep(0.2)
+        t2 = asyncio.create_task(war_service.recompute_city_controller(s2, ids["kazan"]))
+        await asyncio.wait_for(t1, timeout=5)
+        await s1.commit()
+        await asyncio.wait_for(t2, timeout=5)
+        await s2.commit()
+
+    city = await db.get(City, ids["kazan"])
+    await db.refresh(city)
+    assert city.controller_clan_id == clan_id
+
+
+async def test_concurrent_captures_in_one_city_do_not_deadlock(client, db, clock):
+    """Regression: flips in the same city used to deadlock on the city row."""
+    ids = await seed_world(db)
+    cells = [
+        s.h3
+        for s in (
+            await db.execute(select(Sector).where(Sector.city_id == ids["kazan"]).limit(24))
+        ).scalars()
+    ]
+    clans = [await channel_clan(db, chat_id=-(i + 1)) for i in range(4)]
+    players = list(range(200, 224))
+    for i, uid in enumerate(players):
+        await onboard(client, db, uid, ids["kazan"], coins=10_000)
+        await put_in_clan(db, uid, clans[i % 4])
+
+    results = await asyncio.gather(
+        *(act(client, uid, cell, 2000) for uid, cell in zip(players, cells, strict=True))
+    )
+    assert [r.status_code for r in results] == [200] * len(players)
+    owned = (
+        await db.execute(
+            select(func.count()).select_from(Sector).where(Sector.owner_clan_id.is_not(None))
+        )
+    ).scalar_one()
+    assert owned == len(players)
+    city = await db.get(City, ids["kazan"])
+    await db.refresh(city)
+    assert city.controller_clan_id in clans

@@ -62,6 +62,28 @@ chmod +x deploy/*.sh
 2. В настройках блока укажи Reward URL: `https://<домен>/api/ads/callback?userid=[userId]&secret=<ADS_CALLBACK_SECRET>`.
 3. Впиши `ADSGRAM_BLOCK_ID` и `ADS_CALLBACK_SECRET` в `.env` и перезапусти `docker compose up -d`.
 
+## Чек-лист перед запуском
+1. `.env`: `ENV=prod`, `DEV_MODE=false`, сильный `POSTGRES_PASSWORD`, случайный `WEBHOOK_SECRET`, свой ID в `ADMIN_IDS`, `WEB_CONCURRENCY` по числу vCPU.
+2. `docker compose up -d --build`, затем `set_webhook` и `build_world` (см. выше).
+3. Открыть бота, пройти онбординг, захватить сектор, купить тестовый товар за 1 ⭐ (`test_star` виден только админам) и проверить, что пришло сообщение об оплате.
+4. `/stats` в боте показывает цифры; `/admin` — список команд.
+5. Настроить cron для `deploy/backup.sh` и один раз прогнать `deploy/restore_check.sh`.
+6. В @BotFather: описание, аватар, `/setprivacy` не нужен; включить Main Mini App, чтобы игра была в поиске Telegram; настроить партнёрскую программу Stars (Affiliate Program) — 20–30% комиссии.
+7. (По желанию) Adsgram — см. раздел выше.
+
+## Нагрузочный тест
+Сценарий в `loadtest/locustfile.py` (игроки тапают, опрашивают карту, атакуют, покупают улучшения). Запускать **только на тестовой копии** с `DEV_MODE=true`:
+```bash
+pip install locust h3
+locust -f loadtest/locustfile.py --host http://localhost:8000 --headless -u 1000 -r 50 -t 5m
+```
+Результат на 4 ядрах (сервер, PostgreSQL, Redis и сам генератор нагрузки на одной машине, 3 воркера API):
+1000 виртуальных игроков → ~500 запросов/с, 0 ошибок, медиана 24 мс, p95 ≈ 450 мс.
+Виртуальный игрок шлёт запрос раз в 1–3 секунды, это в ~10 раз чаще настоящего клиента
+(тапы уходят пачкой раз в 10 с, карта обновляется раз в 15 с), так что это соответствует примерно 2–3 тысячам
+одновременно играющих людей. При 300 виртуальных игроках: ~165 запросов/с, p95 ≈ 150 мс.
+Узкое место — CPU воркеров API: при росте добавляй `WEB_CONCURRENCY`/ядра, затем выноси PostgreSQL на отдельный сервер.
+
 ## Локальная разработка
 
 Нужны Python 3.11+, Node 22, PostgreSQL 16 и Redis 7.

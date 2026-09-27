@@ -6,13 +6,13 @@ concurrent attacks on the same sector serialized and deadlock-free.
 
 from datetime import datetime
 
-from sqlalchemy import exists, func, select
+from sqlalchemy import exists, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.game import economy, player_service
 from app.game.clan_service import MILITIA
 from app.game.errors import GameError
-from app.models import BattleLog, City, Clan, Sector, User, UserBoost
+from app.models import BattleLog, Clan, Sector, User, UserBoost
 
 
 async def clan_has_sector_in_city(session: AsyncSession, clan_id: int, city_id: int) -> bool:
@@ -51,9 +51,11 @@ async def act_on_sector(
     if user.coins < amount:
         raise GameError("not_enough_coins")
 
-    sector = (
-        await session.execute(select(Sector).where(Sector.h3 == h3).with_for_update())
-    ).scalar_one_or_none()
+    # No autoflush here: the user row is written once, at the explicit flush below.
+    with session.no_autoflush:
+        sector = (
+            await session.execute(select(Sector).where(Sector.h3 == h3).with_for_update())
+        ).scalar_one_or_none()
     if sector is None:
         raise GameError("sector_not_found", 404)
     clan = await session.get(Clan, user.clan_id)
@@ -128,25 +130,39 @@ async def act_on_sector(
     }
 
 
-async def recompute_city_controller(session: AsyncSession, city_id: int) -> int | None:
-    rows = (
-        await session.execute(
-            select(Sector.owner_clan_id, func.sum(Sector.value))
-            .where(Sector.city_id == city_id, Sector.owner_clan_id.is_not(None))
-            .group_by(Sector.owner_clan_id)
-        )
-    ).all()
-    city = await session.get(City, city_id, with_for_update=True)
-    if city is None:
-        return None
-    if not rows:
-        city.controller_clan_id = None
-        return None
-    top = max(total for _, total in rows)
-    leaders = [clan_id for clan_id, total in rows if total == top]
-    if city.controller_clan_id not in leaders:
-        city.controller_clan_id = min(leaders)
-    return city.controller_clan_id
+async def recompute_city_controller(session: AsyncSession, city_id: int) -> None:
+    """Sets the city's controller to the clan with the largest Σ value (ties keep the
+    current controller, then the lowest clan id).
+
+    One atomic UPDATE instead of SELECT ... FOR UPDATE: the users.city_id foreign key
+    makes concurrent attack transactions hold KEY SHARE locks on the city row, and
+    upgrading those to FOR UPDATE deadlocks. UPDATE of a non-key column takes
+    FOR NO KEY UPDATE, which is compatible with KEY SHARE, and it only writes when
+    the controller actually changes.
+    """
+    await session.execute(
+        text(
+            """
+            UPDATE cities SET controller_clan_id = leader.owner_clan_id
+            FROM (
+                SELECT (
+                    SELECT s.owner_clan_id FROM sectors s
+                    WHERE s.city_id = :city AND s.owner_clan_id IS NOT NULL
+                    GROUP BY s.owner_clan_id
+                    ORDER BY SUM(s.value) DESC,
+                             COALESCE(s.owner_clan_id = (
+                                 SELECT controller_clan_id FROM cities WHERE id = :city
+                             ), false) DESC,
+                             s.owner_clan_id
+                    LIMIT 1
+                ) AS owner_clan_id
+            ) AS leader
+            WHERE cities.id = :city
+              AND cities.controller_clan_id IS DISTINCT FROM leader.owner_clan_id
+            """
+        ),
+        {"city": city_id},
+    )
 
 
 def sector_dict(sector: Sector, now: datetime) -> dict:

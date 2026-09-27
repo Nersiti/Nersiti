@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 
-import { api, ApiError } from "../api";
+import { api } from "../api";
 import { ClanEmblem, ClanRow, JoinClanButton, kindLabel } from "../components/ClanParts";
 import ShareSheet from "../components/ShareSheet";
 import Sheet from "../components/Sheet";
-import { toast } from "../components/Toast";
+import { toastError } from "../components/Toast";
 import { compactNumber, t } from "../i18n";
 import { useStore } from "../store";
 import { purchase } from "../shop";
@@ -34,7 +34,7 @@ export default function Clan() {
   }, [clanId]);
 
   useEffect(() => {
-    void reload().catch(() => toast("network", "error"));
+    void reload().catch(() => toastError(null));
   }, [reload]);
 
   if (!state || !config) return null;
@@ -46,7 +46,7 @@ export default function Clan() {
       haptic("success");
       setState(res.state);
     } catch (e) {
-      toast(e instanceof ApiError ? e.code : "network", "error");
+      toastError(e);
     }
   };
 
@@ -192,7 +192,7 @@ export function ClanSheet(props: { clanId: number | null; onClose: () => void; o
     if (props.clanId === null) return;
     api<ClanDetails>(`/clans/${props.clanId}`)
       .then(setClan)
-      .catch(() => toast("network", "error"));
+      .catch(() => toastError(null));
   }, [props.clanId]);
 
   return (

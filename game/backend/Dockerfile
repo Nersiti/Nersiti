@@ -20,4 +20,5 @@ RUN mkdir -p /app/data && useradd --create-home --uid 1000 game && chown -R game
 USER game
 
 EXPOSE 8000
-CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2 --proxy-headers --forwarded-allow-ips='*'"]
+# Worker processes: WEB_CONCURRENCY (see .env.example), roughly one per vCPU.
+CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers ${WEB_CONCURRENCY:-2} --proxy-headers --forwarded-allow-ips='*'"]

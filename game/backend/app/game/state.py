@@ -1,5 +1,6 @@
 """Serializes the player's state for the Mini App."""
 
+import time
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,11 +16,50 @@ def _iso(dt: datetime | None) -> str | None:
     return dt.isoformat() if dt else None
 
 
+# Per-process caches: every request returns the full state, and cities never change
+# while clan summaries may lag a few seconds. This saves two queries per request.
+_CITY_TTL = 300.0
+_CLAN_TTL = 10.0
+_city_cache: dict[tuple[int, str], tuple[float, dict]] = {}
+_clan_cache: dict[tuple[int, str], tuple[float, dict]] = {}
+
+
+def reset_caches() -> None:
+    _city_cache.clear()
+    _clan_cache.clear()
+
+
+async def _city_info(session: AsyncSession, city_id: int, lang: str) -> dict | None:
+    key = (city_id, lang)
+    hit = _city_cache.get(key)
+    if hit and time.monotonic() - hit[0] < _CITY_TTL:
+        return hit[1]
+    city = await session.get(City, city_id)
+    if city is None:
+        return None
+    info = world_service.city_to_dict(city, lang)
+    _city_cache[key] = (time.monotonic(), info)
+    return info
+
+
+async def _clan_info(session: AsyncSession, clan_id: int, lang: str) -> dict | None:
+    key = (clan_id, lang)
+    hit = _clan_cache.get(key)
+    if hit and time.monotonic() - hit[0] < _CLAN_TTL:
+        return hit[1]
+    clan = await session.get(Clan, clan_id)
+    if clan is None:
+        return None
+    info = await clan_service.clan_summary(session, clan, lang)
+    _clan_cache[key] = (time.monotonic(), info)
+    return info
+
+
 async def build_state(session: AsyncSession, user: User, now: datetime | None = None) -> dict:
     now = now or datetime.now(UTC)
     lang = pick_lang(user.language_code)
-    city = await session.get(City, user.city_id) if user.city_id else None
-    clan = await session.get(Clan, user.clan_id) if user.clan_id else None
+    city = await _city_info(session, user.city_id, lang) if user.city_id else None
+    clan = await _clan_info(session, user.clan_id, lang) if user.clan_id else None
     vip = is_vip(user, now)
     level_from, level_to = economy.level_bounds(user.level)
     today = now.date()
@@ -45,8 +85,8 @@ async def build_state(session: AsyncSession, user: User, now: datetime | None = 
         "country_name": (
             world_service.country_name(user.country_code, lang) if user.country_code else None
         ),
-        "city": world_service.city_to_dict(city, lang) if city else None,
-        "clan": await clan_service.clan_summary(session, clan, lang) if clan else None,
+        "city": city,
+        "clan": clan,
         "clan_joined_at": _iso(user.clan_joined_at),
         "coins": user.coins,
         "total_earned": user.total_earned,

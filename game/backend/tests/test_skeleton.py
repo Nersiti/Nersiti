@@ -62,3 +62,13 @@ def test_pick_lang():
     assert pick_lang("pt-br") == "en"
     assert pick_lang(None) == "en"
     assert t("en", "start.button") == "🌍 Play"
+
+
+def test_locales_have_the_same_keys():
+    import json
+    from pathlib import Path
+
+    locales = Path(__file__).resolve().parents[1] / "app" / "locales"
+    ru = json.loads((locales / "ru.json").read_text(encoding="utf-8"))
+    en = json.loads((locales / "en.json").read_text(encoding="utf-8"))
+    assert set(ru) == set(en)

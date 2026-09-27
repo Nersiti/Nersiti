@@ -1,7 +1,7 @@
 import { useState } from "react";
 
 import { api } from "../api";
-import { toast } from "../components/Toast";
+import { toastError } from "../components/Toast";
 import { compactNumber, formatNumber, t } from "../i18n";
 import { useStore } from "../store";
 import { haptic } from "../tg";
@@ -23,7 +23,7 @@ export default function Profile() {
       haptic("select");
       setState(res.state);
     } catch {
-      toast("network", "error");
+      toastError(null);
     } finally {
       setBusy(false);
     }

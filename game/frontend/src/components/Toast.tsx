@@ -1,5 +1,8 @@
 import { create } from "zustand";
 
+import { ApiError } from "../api";
+import { errorText } from "../i18n";
+
 interface ToastStore {
   text: string | null;
   kind: "info" | "error" | "success";
@@ -26,4 +29,9 @@ export default function Toast() {
   const { text, kind } = useToast();
   if (!text) return null;
   return <div className={`toast toast-${kind}`}>{text}</div>;
+}
+
+/** Shows an API/network error in plain words. */
+export function toastError(e: unknown, prefix?: string): void {
+  toast(errorText(e instanceof ApiError ? e.code : "network", prefix), "error");
 }
