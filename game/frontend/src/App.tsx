@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import BottomNav from "./components/BottomNav";
 import Toast from "./components/Toast";
 import { t } from "./i18n";
+import Clan, { InviteSheet } from "./screens/Clan";
 import Hq from "./screens/Hq";
 import Onboarding from "./screens/Onboarding";
 import Soon from "./screens/Soon";
@@ -56,10 +57,11 @@ export default function App() {
         {tab === "hq" && <Hq />}
         {tab === "upgrades" && <Upgrades />}
         {tab === "map" && <Soon icon="🗺️" />}
-        {tab === "clan" && <Soon icon="⚔️" />}
+        {tab === "clan" && <Clan />}
         {tab === "more" && <Soon icon="☰" />}
       </main>
       <BottomNav />
+      <InviteSheet />
       <Toast />
     </div>
   );

@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_user, get_user_locked, limit
 from app.db import get_session
-from app.game import world_service
+from app.game import clan_service, player_service, world_service
 from app.game.state import build_state
 from app.i18n import pick_lang
 from app.models import City, User
@@ -59,6 +59,7 @@ async def onboarding(
 
     user.country_code = country
     user.city_id = city.id
+    await clan_service.join_militia(session, user, player_service.utcnow())
     state = await build_state(session, user)
     await session.commit()
     return {"state": state}

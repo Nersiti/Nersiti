@@ -31,12 +31,43 @@ export interface DailyInfo {
   rewards: number[];
 }
 
+export interface ClanSummary {
+  id: number;
+  title: string;
+  kind: "militia" | "channel" | "group";
+  is_militia: boolean;
+  color: string;
+  members_count: number;
+  season_points: number;
+  username: string | null;
+  subscribers_only: boolean;
+  subscribe_url: string | null;
+  city_id: number | null;
+}
+
+export interface ClanMember {
+  id: number;
+  first_name: string;
+  season_score: number;
+}
+
+export interface ClanDetails extends ClanSummary {
+  rank: number;
+  sectors_held: number;
+  invite_link: string;
+  is_member: boolean;
+  is_owner: boolean;
+  top_members: ClanMember[];
+}
+
 export interface PlayerState {
   user: PlayerUser;
   onboarded: boolean;
   country_code: string | null;
   country_name: string | null;
   city: CityInfo | null;
+  clan: ClanSummary | null;
+  clan_joined_at: string | null;
   coins: number;
   total_earned: number;
   level: number;
@@ -64,6 +95,7 @@ export interface GameConfig {
 export interface SessionResponse {
   created: boolean;
   offline_earned: number;
+  invite_clan: ClanSummary | null;
   state: PlayerState;
   config: GameConfig;
 }

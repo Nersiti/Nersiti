@@ -3,7 +3,7 @@ import { create } from "zustand";
 import { api, ApiError } from "./api";
 import { setLang } from "./i18n";
 import { startParam } from "./tg";
-import type { GameConfig, PlayerState, SessionResponse } from "./types";
+import type { ClanSummary, GameConfig, PlayerState, SessionResponse } from "./types";
 
 export type Tab = "hq" | "map" | "upgrades" | "clan" | "more";
 
@@ -14,6 +14,8 @@ interface Store {
   config: GameConfig | null;
   isNewPlayer: boolean;
   offlineEarned: number;
+  /** Clan from a c_<id> link, offered after onboarding. */
+  inviteClan: ClanSummary | null;
   /** Client clock (ms) when `state` was received: used to predict energy/passive income. */
   syncedAt: number;
   /** Taps made locally but not yet sent to the server. */
@@ -25,6 +27,7 @@ interface Store {
   setState: (state: PlayerState) => void;
   setTab: (tab: Tab) => void;
   dismissOffline: () => void;
+  dismissInvite: () => void;
   tap: () => boolean;
   flushTaps: (keepalive?: boolean) => Promise<void>;
 }
@@ -36,6 +39,7 @@ export const useStore = create<Store>((set, get) => ({
   config: null,
   isNewPlayer: false,
   offlineEarned: 0,
+  inviteClan: null,
   syncedAt: Date.now(),
   pendingTaps: 0,
   flushing: false,
@@ -52,6 +56,7 @@ export const useStore = create<Store>((set, get) => ({
         config: res.config,
         isNewPlayer: res.created,
         offlineEarned: res.offline_earned,
+        inviteClan: res.invite_clan,
         syncedAt: Date.now(),
       });
     } catch (e) {
@@ -62,6 +67,7 @@ export const useStore = create<Store>((set, get) => ({
   setState: (state) => set({ state, syncedAt: Date.now() }),
   setTab: (tab) => set({ tab }),
   dismissOffline: () => set({ offlineEarned: 0 }),
+  dismissInvite: () => set({ inviteClan: null }),
 
   tap: () => {
     const { state, syncedAt, pendingTaps } = get();

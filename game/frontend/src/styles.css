@@ -76,7 +76,7 @@ button {
 }
 
 .btn-secondary {
-  background: var(--bg2);
+  background: color-mix(in srgb, var(--hint) 18%, transparent);
   color: var(--text);
 }
 
@@ -416,12 +416,13 @@ button {
   width: min(72vw, 300px);
   aspect-ratio: 1;
   border-radius: 50%;
+  --ring: var(--clan, var(--accent));
   background:
-    radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--accent) 55%, #ffffff 10%), transparent 60%),
-    radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--accent) 70%, #0b1a3a), #0b1024);
+    radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--ring) 55%, #ffffff 10%), transparent 60%),
+    radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--ring) 55%, #0b1a3a), #0b1024);
   box-shadow:
-    0 0 0 8px color-mix(in srgb, var(--accent) 22%, transparent),
-    0 0 60px color-mix(in srgb, var(--accent) 45%, transparent);
+    0 0 0 8px color-mix(in srgb, var(--ring) 28%, transparent),
+    0 0 60px color-mix(in srgb, var(--ring) 45%, transparent);
   transition: transform 0.08s ease;
   touch-action: manipulation;
   overflow: visible;
@@ -712,4 +713,135 @@ button {
 
 .combo-slot.found {
   background: color-mix(in srgb, var(--success) 30%, var(--bg));
+}
+
+/* ---------- Clan ---------- */
+.clan-emblem {
+  flex-shrink: 0;
+  border-radius: 30%;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-weight: 800;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+}
+
+.clan-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border-radius: var(--radius);
+  background: var(--bg2);
+  border-left: 4px solid;
+}
+
+.clan-card-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.clan-card-title {
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.stat-row.four {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.stat-row.four .stat {
+  background: var(--bg);
+}
+
+.row-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.row-actions .btn {
+  flex: 1;
+}
+
+.section-title {
+  font-weight: 800;
+  font-size: 16px;
+}
+
+.members {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.member {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 4px;
+  border-radius: 8px;
+}
+
+.member.me {
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+}
+
+.clan-pos {
+  width: 22px;
+  text-align: center;
+  color: var(--hint);
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.create-clan {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border-radius: var(--radius);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 25%, var(--bg2)), var(--bg2));
+}
+
+.create-clan p {
+  margin: 4px 0 0;
+}
+
+.list-plain {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.clan-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 12px;
+  background: var(--bg2);
+  text-align: left;
+}
+
+.clan-row.mine {
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.clan-row-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.clan-row-title {
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.clan-row-points {
+  color: var(--gold);
+  font-weight: 800;
 }

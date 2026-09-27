@@ -105,3 +105,20 @@ export function haptic(kind: "tap" | "success" | "error" | "select" = "tap"): vo
   else if (kind === "select") h.selectionChanged();
   else h.notificationOccurred(kind);
 }
+
+/** Opens a t.me link inside Telegram (or a new tab outside it). */
+export function openTgLink(url: string): void {
+  const wa = webApp();
+  if (wa && url.startsWith("https://t.me/")) wa.openTelegramLink(url);
+  else window.open(url, "_blank");
+}
+
+export function shareLink(url: string, text: string): void {
+  openTgLink(`https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`);
+}
+
+export function confirmDialog(message: string): Promise<boolean> {
+  const wa = webApp();
+  if (wa) return new Promise((resolve) => wa.showConfirm(message, (ok) => resolve(ok)));
+  return Promise.resolve(window.confirm(message));
+}

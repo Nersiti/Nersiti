@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from aiogram.types import Update
 from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.responses import JSONResponse
+from pydantic import ValidationError
 from sqlalchemy import text
 
 from app.api import build_api_router
@@ -53,10 +54,14 @@ async def telegram_webhook(
     if not hmac.compare_digest(x_telegram_bot_api_secret_token or "", expected):
         raise HTTPException(status_code=403)
     bot = get_bot()
-    update = Update.model_validate(await request.json(), context={"bot": bot})
+    # Never return 5xx to Telegram: it would re-deliver the update forever.
+    try:
+        update = Update.model_validate(await request.json(), context={"bot": bot})
+    except ValidationError:
+        log.exception("Unparsable update")
+        return {"ok": False}
     try:
         await get_dispatcher().feed_update(bot, update)
     except Exception:
-        # Never return 5xx to Telegram: it would re-deliver the update forever.
         log.exception("Failed to process update %s", update.update_id)
     return {"ok": True}

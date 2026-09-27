@@ -1,4 +1,4 @@
-import { useRef, useState, type PointerEvent } from "react";
+import { useRef, useState, type CSSProperties, type PointerEvent } from "react";
 
 import { api, ApiError } from "../api";
 import Sheet from "../components/Sheet";
@@ -87,6 +87,7 @@ export default function Hq() {
       <div className="tap-area">
         <button
           className={`tap-button ${pressed ? "pressed" : ""}`}
+          style={state.clan ? ({ "--clan": state.clan.color } as CSSProperties) : undefined}
           onPointerDown={(e) => {
             setPressed(true);
             onTap(e);

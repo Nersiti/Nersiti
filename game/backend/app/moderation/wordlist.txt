@@ -1,0 +1,31 @@
+# Fragments that make a clan title unacceptable (matched after lowercasing and
+# removing spaces/punctuation). Keep political and hate terms here as well as profanity.
+# Profanity (ru)
+хуй
+хуе
+хуё
+пизд
+ебат
+ебан
+ебал
+ебуч
+блядь
+бляд
+мудак
+пидор
+пидар
+гандон
+шлюх
+# Profanity (en)
+fuck
+shit
+bitch
+cunt
+nigger
+faggot
+# Extremism / politics
+нацист
+фашист
+nazi
+hitler
+гитлер

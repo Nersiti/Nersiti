@@ -4,6 +4,7 @@ from aiogram import F, Router
 from aiogram.filters import Command, CommandObject, CommandStart
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, Message, WebAppInfo
 
+from app.bot.handlers.clans import send_newclan_prompt
 from app.config import get_settings
 from app.i18n import pick_lang, t
 
@@ -28,6 +29,9 @@ def play_keyboard(lang: str, start_param: str | None = None) -> InlineKeyboardMa
 
 @router.message(CommandStart())
 async def cmd_start(message: Message, command: CommandObject) -> None:
+    if command.args == "newclan":
+        await send_newclan_prompt(message)
+        return
     lang = pick_lang(message.from_user.language_code if message.from_user else None)
     await message.answer(
         t(lang, "start.greeting", game=get_settings().game_name),

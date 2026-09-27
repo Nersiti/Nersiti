@@ -5,10 +5,10 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
-from app.game import economy, world_service
+from app.game import clan_service, economy, world_service
 from app.game.player_service import has_autocollector, is_vip
 from app.i18n import pick_lang
-from app.models import City, User
+from app.models import City, Clan, User
 
 
 def _iso(dt: datetime | None) -> str | None:
@@ -19,6 +19,7 @@ async def build_state(session: AsyncSession, user: User, now: datetime | None = 
     now = now or datetime.now(UTC)
     lang = pick_lang(user.language_code)
     city = await session.get(City, user.city_id) if user.city_id else None
+    clan = await session.get(Clan, user.clan_id) if user.clan_id else None
     vip = is_vip(user, now)
     level_from, level_to = economy.level_bounds(user.level)
     today = now.date()
@@ -45,6 +46,8 @@ async def build_state(session: AsyncSession, user: User, now: datetime | None = 
             world_service.country_name(user.country_code, lang) if user.country_code else None
         ),
         "city": world_service.city_to_dict(city, lang) if city else None,
+        "clan": await clan_service.clan_summary(session, clan, lang) if clan else None,
+        "clan_joined_at": _iso(user.clan_joined_at),
         "coins": user.coins,
         "total_earned": user.total_earned,
         "level": user.level,
