@@ -205,3 +205,21 @@ def resolve_battle(
 def action_power(amount: int, mult: float, foothold: bool) -> int:
     power = math.floor(amount * mult)
     return power // FOOTHOLD_DIVISOR if foothold else power
+
+
+# --- Seasons (PLAN.md, section B, "Сезон") -----------------------------------------
+
+SEASON_DAYS = 30
+SEASON_TOP_CLANS = 3
+SEASON_TOP_PLAYERS = 100
+# Coins for every member of the top-3 clans, by place.
+SEASON_CLAN_MEMBER_REWARDS = [500_000, 250_000, 100_000]
+# Coins for the top players: places 1-3, then everyone else in the top 100.
+SEASON_PLAYER_REWARDS = [1_000_000, 500_000, 250_000]
+SEASON_TOP100_REWARD = 50_000
+
+
+def season_player_reward(place: int) -> int:
+    if place <= len(SEASON_PLAYER_REWARDS):
+        return SEASON_PLAYER_REWARDS[place - 1]
+    return SEASON_TOP100_REWARD if place <= SEASON_TOP_PLAYERS else 0

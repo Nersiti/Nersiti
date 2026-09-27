@@ -3,8 +3,8 @@ import { useRef, useState, type CSSProperties, type PointerEvent } from "react";
 import { api, ApiError } from "../api";
 import Sheet from "../components/Sheet";
 import { toast } from "../components/Toast";
-import { useLiveBalance } from "../hooks";
-import { compactNumber, formatNumber, t } from "../i18n";
+import { useLiveBalance, useNow } from "../hooks";
+import { compactNumber, formatDuration, formatNumber, t } from "../i18n";
 import { useStore, withFlushedTaps } from "../store";
 import { haptic } from "../tg";
 import type { PlayerState } from "../types";
@@ -19,7 +19,8 @@ interface Float {
 let floatId = 0;
 
 export default function Hq() {
-  const { state, tap, offlineEarned, dismissOffline } = useStore();
+  const { state, tap, offlineEarned, dismissOffline, season, seasonAt, setTab, setMore } = useStore();
+  const now = useNow(30_000);
   const { coins, energy } = useLiveBalance();
   const [floats, setFloats] = useState<Float[]>([]);
   const [pressed, setPressed] = useState(false);
@@ -71,6 +72,19 @@ export default function Hq() {
         />
         <Stat label={t("hq.perHour")} value={`+${compactNumber(state.income_per_hour)}`} />
       </div>
+
+      {season && (
+        <button
+          className="season-chip"
+          onClick={() => {
+            setTab("more");
+            setMore("leaderboard");
+          }}
+        >
+          🏆 {t("season.title", { n: season.number })} ·{" "}
+          {formatDuration(season.seconds_left - (now - seasonAt) / 1000)}
+        </button>
+      )}
 
       <div className="coin-counter">
         <span className="coin-icon">🪙</span>

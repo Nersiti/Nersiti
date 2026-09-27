@@ -118,6 +118,40 @@ const ru = {
   "clan.inviteSheet.title": "Тебя пригласили в клан",
   "clan.inviteSheet.skip": "Не сейчас",
 
+  "more.leaderboard": "Рейтинг",
+  "more.leaderboard.hint": "Лучшие игроки, кланы, страны и города сезона",
+  "more.tasks": "Задания",
+  "more.tasks.hint": "Бонусные монеты за простые действия",
+  "more.shop": "Магазин",
+  "more.shop.hint": "Ускорения, щиты и VIP за Telegram Stars",
+  "more.profile": "Профиль",
+  "more.profile.hint": "Твоя статистика и настройки",
+  "back": "Назад",
+
+  "lb.players": "Игроки",
+  "lb.clans": "Кланы",
+  "lb.countries": "Страны",
+  "lb.cities": "Города",
+  "lb.scope.global": "Мир",
+  "lb.scope.country": "Страна",
+  "lb.scope.city": "Город",
+  "lb.me": "Твоё место: #{rank}",
+  "lb.empty": "Пока никого нет — стань первым!",
+  "season.title": "Сезон {n}",
+  "season.left": "До конца сезона: {time}",
+  "season.hint": "Каждый час клан получает очки за удержанные секторы. В конце сезона лучшие получают награды, а карта начинается заново.",
+  "season.hall": "Зал славы",
+  "time.dh": "{d} д {h} ч",
+  "time.hm": "{h} ч {m} мин",
+
+  "profile.level": "Уровень",
+  "profile.earned": "Заработано всего",
+  "profile.score": "Очки сезона",
+  "profile.city": "Город",
+  "profile.country": "Страна",
+  "profile.clan": "Клан",
+  "profile.power": "Атака / оборона",
+
   "map.home": "Мой город",
   "map.zoomIn": "Приблизь карту, чтобы увидеть секторы",
   "map.loading": "Загрузка карты…",
@@ -272,6 +306,40 @@ const en: Record<I18nKey, string> = {
   "clan.inviteSheet.title": "You've been invited to a clan",
   "clan.inviteSheet.skip": "Not now",
 
+  "more.leaderboard": "Leaderboard",
+  "more.leaderboard.hint": "Top players, clans, countries and cities of the season",
+  "more.tasks": "Tasks",
+  "more.tasks.hint": "Bonus coins for simple actions",
+  "more.shop": "Shop",
+  "more.shop.hint": "Boosts, shields and VIP for Telegram Stars",
+  "more.profile": "Profile",
+  "more.profile.hint": "Your stats and settings",
+  "back": "Back",
+
+  "lb.players": "Players",
+  "lb.clans": "Clans",
+  "lb.countries": "Countries",
+  "lb.cities": "Cities",
+  "lb.scope.global": "World",
+  "lb.scope.country": "Country",
+  "lb.scope.city": "City",
+  "lb.me": "Your rank: #{rank}",
+  "lb.empty": "Nobody here yet — be the first!",
+  "season.title": "Season {n}",
+  "season.left": "Season ends in {time}",
+  "season.hint": "Every hour a clan scores points for held sectors. At the end of the season the best get rewards and the map starts over.",
+  "season.hall": "Hall of fame",
+  "time.dh": "{d}d {h}h",
+  "time.hm": "{h}h {m}m",
+
+  "profile.level": "Level",
+  "profile.earned": "Total earned",
+  "profile.score": "Season points",
+  "profile.city": "City",
+  "profile.country": "Country",
+  "profile.clan": "Clan",
+  "profile.power": "Attack / defense",
+
   "map.home": "My city",
   "map.zoomIn": "Zoom in to see sectors",
   "map.loading": "Loading map…",
@@ -342,4 +410,12 @@ export function compactNumber(n: number): string {
     notation: "compact",
     maximumFractionDigits: n >= 1000 ? 2 : 0,
   }).format(Math.floor(n));
+}
+
+export function formatDuration(seconds: number): string {
+  const s = Math.max(0, Math.floor(seconds));
+  const d = Math.floor(s / 86400);
+  const h = Math.floor((s % 86400) / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  return d > 0 ? t("time.dh", { d, h }) : t("time.hm", { h, m });
 }

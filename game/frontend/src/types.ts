@@ -186,3 +186,36 @@ export interface SectorActionResult {
   flipped: boolean;
   foothold: boolean;
 }
+
+export interface SeasonInfo {
+  number: number;
+  starts_at: string;
+  ends_at: string;
+  seconds_left: number;
+  hall_of_fame: { number: number; clans: { id: number; title: string; color: string; points: number }[] }[];
+}
+
+export interface PlayerRow {
+  id: number;
+  name: string;
+  score: number;
+  country_code: string | null;
+}
+
+export interface CountryRow {
+  code: string;
+  name: string;
+  score: number;
+}
+
+export interface CityRow {
+  id: number;
+  name: string;
+  country_code: string;
+  score: number;
+}
+
+export interface Leaderboard<T> {
+  items: T[];
+  me: { rank: number | null; score?: number } | null;
+}

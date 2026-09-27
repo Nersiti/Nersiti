@@ -3,9 +3,10 @@ import { create } from "zustand";
 import { api, ApiError } from "./api";
 import { setLang } from "./i18n";
 import { startParam } from "./tg";
-import type { ClanSummary, GameConfig, PlayerState, SessionResponse } from "./types";
+import type { ClanSummary, GameConfig, PlayerState, SeasonInfo, SessionResponse } from "./types";
 
 export type Tab = "hq" | "map" | "upgrades" | "clan" | "more";
+export type MoreScreen = "menu" | "leaderboard" | "profile" | "tasks" | "shop";
 
 interface Store {
   status: "loading" | "ready" | "error";
@@ -22,10 +23,16 @@ interface Store {
   pendingTaps: number;
   flushing: boolean;
   tab: Tab;
+  more: MoreScreen;
+  season: SeasonInfo | null;
+  /** Client clock (ms) when `season` was received. */
+  seasonAt: number;
 
   load: () => Promise<void>;
   setState: (state: PlayerState) => void;
   setTab: (tab: Tab) => void;
+  setMore: (screen: MoreScreen) => void;
+  loadSeason: () => Promise<void>;
   dismissOffline: () => void;
   dismissInvite: () => void;
   tap: () => boolean;
@@ -44,6 +51,9 @@ export const useStore = create<Store>((set, get) => ({
   pendingTaps: 0,
   flushing: false,
   tab: "hq",
+  more: "menu",
+  season: null,
+  seasonAt: 0,
 
   load: async () => {
     set({ status: "loading", error: null });
@@ -65,7 +75,15 @@ export const useStore = create<Store>((set, get) => ({
   },
 
   setState: (state) => set({ state, syncedAt: Date.now() }),
-  setTab: (tab) => set({ tab }),
+  setTab: (tab) => set({ tab, more: "menu" }),
+  setMore: (more) => set({ more }),
+  loadSeason: async () => {
+    try {
+      set({ season: await api<SeasonInfo>("/season"), seasonAt: Date.now() });
+    } catch {
+      /* optional UI element */
+    }
+  },
   dismissOffline: () => set({ offlineEarned: 0 }),
   dismissInvite: () => set({ inviteClan: null }),
 

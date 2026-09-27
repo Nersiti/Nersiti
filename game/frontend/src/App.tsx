@@ -5,8 +5,8 @@ import Toast from "./components/Toast";
 import { t } from "./i18n";
 import Clan, { InviteSheet } from "./screens/Clan";
 import Hq from "./screens/Hq";
+import More from "./screens/More";
 import Onboarding from "./screens/Onboarding";
-import Soon from "./screens/Soon";
 import Upgrades from "./screens/Upgrades";
 import { useStore } from "./store";
 
@@ -16,11 +16,11 @@ const MapScreen = lazy(() => import("./screens/Map"));
 const TAP_FLUSH_INTERVAL_MS = 10_000;
 
 export default function App() {
-  const { status, error, state, load, tab } = useStore();
+  const { status, error, state, load, tab, loadSeason } = useStore();
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    void load().then(() => loadSeason());
+  }, [load, loadSeason]);
 
   // Send accumulated taps every 10s and when the app goes to the background.
   useEffect(() => {
@@ -65,7 +65,7 @@ export default function App() {
           </Suspense>
         )}
         {tab === "clan" && <Clan />}
-        {tab === "more" && <Soon icon="☰" />}
+        {tab === "more" && <More />}
       </main>
       <BottomNav />
       <InviteSheet />

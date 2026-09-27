@@ -99,6 +99,8 @@ def credit(user: User, amount: int) -> None:
 
 def sync_user(user: User, now: datetime) -> int:
     """Applies energy regeneration and passive income. Returns passive coins credited."""
+    # Rewards granted in bulk SQL (season end) bypass credit(), so re-derive the level.
+    user.level = max(user.level, economy.level_for(user.total_earned))
     user.energy, user.energy_updated_at = economy.regen_energy(
         user.energy, user.energy_max, user.energy_updated_at, now
     )
