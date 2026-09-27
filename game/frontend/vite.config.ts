@@ -9,6 +9,9 @@ export default defineConfig({
       "/api": "http://localhost:8000",
     },
   },
+  worker: {
+    format: "es",
+  },
   build: {
     target: "es2021",
     chunkSizeWarningLimit: 1500,

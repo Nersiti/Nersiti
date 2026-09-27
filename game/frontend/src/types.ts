@@ -121,3 +121,68 @@ export interface ComboStatus {
   reward: number;
   claimed: boolean;
 }
+
+export interface MapClan {
+  title: string;
+  color: string;
+  is_militia: boolean;
+}
+
+/** [h3, owner_clan_id, defense, value, shielded] */
+export type SectorTuple = [string, number | null, number, number, 0 | 1];
+
+export interface MapSectorsResponse {
+  sectors: SectorTuple[];
+  clans: Record<string, MapClan>;
+  truncated: boolean;
+}
+
+export interface MapCity {
+  id: number;
+  name: string;
+  lat: number;
+  lng: number;
+  population: number;
+  controller_clan_id: number | null;
+}
+
+export interface MapCitiesResponse {
+  cities: MapCity[];
+  clans: Record<string, MapClan>;
+}
+
+export interface SectorLogEntry {
+  user: string;
+  clan: MapClan | null;
+  action: "capture" | "attack" | "reinforce";
+  power: number;
+  flipped: boolean;
+  at: string;
+}
+
+export interface SectorDetails {
+  h3: string;
+  city_id: number;
+  value: number;
+  owner_clan_id: number | null;
+  defense: number;
+  shield_until: string | null;
+  capture_cost: number;
+  city: { id: number; name: string } | null;
+  owner: ClanSummary | null;
+  is_own: boolean;
+  foothold: boolean;
+  militia_blocked: boolean;
+  attack_mult: number;
+  defense_mult: number;
+  foothold_divisor: number;
+  min_amount: number;
+  log: SectorLogEntry[];
+}
+
+export interface SectorActionResult {
+  action: "capture" | "attack" | "reinforce";
+  power: number;
+  flipped: boolean;
+  foothold: boolean;
+}

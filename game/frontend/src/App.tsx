@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { lazy, Suspense, useEffect } from "react";
 
 import BottomNav from "./components/BottomNav";
 import Toast from "./components/Toast";
@@ -9,6 +9,9 @@ import Onboarding from "./screens/Onboarding";
 import Soon from "./screens/Soon";
 import Upgrades from "./screens/Upgrades";
 import { useStore } from "./store";
+
+// MapLibre is large: load it only when the map tab is opened.
+const MapScreen = lazy(() => import("./screens/Map"));
 
 const TAP_FLUSH_INTERVAL_MS = 10_000;
 
@@ -56,7 +59,11 @@ export default function App() {
       <main className="app-main">
         {tab === "hq" && <Hq />}
         {tab === "upgrades" && <Upgrades />}
-        {tab === "map" && <Soon icon="🗺️" />}
+        {tab === "map" && (
+          <Suspense fallback={<div className="center-screen">{t("map.loading")}</div>}>
+            <MapScreen />
+          </Suspense>
+        )}
         {tab === "clan" && <Clan />}
         {tab === "more" && <Soon icon="☰" />}
       </main>

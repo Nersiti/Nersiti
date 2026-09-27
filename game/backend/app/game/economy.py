@@ -146,3 +146,62 @@ def combo_reward(income_per_hour: int) -> int:
 
 def bp_to_mult(bonus_bp: int) -> float:
     return 1 + bonus_bp / 10_000
+
+
+# --- War (PLAN.md, section B, "Бой") -----------------------------------------------
+
+NEUTRAL_DEFENSE_PER_VALUE = 200
+DEFENSE_CAP_PER_VALUE = 5_000_000
+DEFENSE_DECAY_PER_HOUR = 0.99
+FOOTHOLD_DIVISOR = 3
+MIN_ACTION_COINS = 10
+ACTION_COOLDOWN_SECONDS = 2
+CAPTURE_SCORE_PER_VALUE = 100
+ARTILLERY_MULTIPLIER = 2
+SHIELD_MAX_SHARE = 0.10
+
+
+def decayed_defense(defense: int, updated_at: datetime | None, now: datetime) -> int:
+    if defense <= 0 or updated_at is None:
+        return max(0, defense)
+    hours = max(0.0, (now - updated_at).total_seconds() / 3600)
+    return math.floor(defense * DEFENSE_DECAY_PER_HOUR**hours)
+
+
+def defense_cap(value: int) -> int:
+    return value * DEFENSE_CAP_PER_VALUE
+
+
+def neutral_capture_cost(value: int) -> int:
+    return value * NEUTRAL_DEFENSE_PER_VALUE
+
+
+@dataclass(frozen=True)
+class BattleOutcome:
+    action: str  # "capture" | "attack" | "reinforce"
+    owner_clan_id: int | None
+    defense: int
+    flipped: bool
+
+
+def resolve_battle(
+    owner_clan_id: int | None, defense_now: int, value: int, actor_clan_id: int, power: int
+) -> BattleOutcome | None:
+    """Applies `power` of `actor_clan_id` to a sector. None: not enough to capture a
+    neutral sector (the action is rejected and nothing is spent)."""
+    cap = defense_cap(value)
+    if owner_clan_id is None:
+        if power < neutral_capture_cost(value):
+            return None
+        return BattleOutcome("capture", actor_clan_id, min(power, cap), True)
+    if owner_clan_id == actor_clan_id:
+        return BattleOutcome("reinforce", owner_clan_id, min(defense_now + power, cap), False)
+    remaining = defense_now - power
+    if remaining < 0:
+        return BattleOutcome("attack", actor_clan_id, min(-remaining, cap), True)
+    return BattleOutcome("attack", owner_clan_id, remaining, False)
+
+
+def action_power(amount: int, mult: float, foothold: bool) -> int:
+    power = math.floor(amount * mult)
+    return power // FOOTHOLD_DIVISOR if foothold else power
