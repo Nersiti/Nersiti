@@ -1,0 +1,8 @@
+{
+  "start.greeting": "⚔️ <b>{game}</b>\n\nThe whole world map is split into sectors. Play for your city and clan, earn coins and capture territory!\n\nTap the button below to open the game.",
+  "start.button": "🌍 Play",
+  "help.text": "<b>{game}</b>\n\n/start — open the game\n/newclan — create a clan from your channel or group\n/help — help\n/terms — terms\n/privacy — privacy\n/paysupport — payment support",
+  "terms.text": "This is an entertainment game. In-game coins have no monetary value and cannot be withdrawn. Telegram Stars purchases only grant in-game benefits.",
+  "privacy.text": "We store only your Telegram ID, name, username and game progress. Data is not shared with third parties.",
+  "paysupport.text": "For payment questions, message the administrator: describe the purchase and its date. We reply within 48 hours."
+}
