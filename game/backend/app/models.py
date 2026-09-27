@@ -188,6 +188,8 @@ class BattleLog(Base):
     power: Mapped[int] = mapped_column(BigInteger)
     flipped: Mapped[bool] = mapped_column(Boolean, default=False)
     prev_owner_clan_id: Mapped[int | None] = mapped_column(Integer)
+    # Who held the sector before a flip (receives the "your sector was captured" message).
+    prev_actor_id: Mapped[int | None] = mapped_column(BigInteger)
 
     __table_args__ = (Index("ix_battle_log_prev_owner", "prev_owner_clan_id", "created_at"),)
 

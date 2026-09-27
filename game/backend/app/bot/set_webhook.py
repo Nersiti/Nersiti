@@ -11,12 +11,14 @@ COMMANDS = {
     "ru": [
         BotCommand(command="start", description="Открыть игру"),
         BotCommand(command="newclan", description="Создать клан"),
+        BotCommand(command="settings", description="Уведомления"),
         BotCommand(command="help", description="Помощь"),
         BotCommand(command="paysupport", description="Вопросы по оплате"),
     ],
     "en": [
         BotCommand(command="start", description="Open the game"),
         BotCommand(command="newclan", description="Create a clan"),
+        BotCommand(command="settings", description="Notifications"),
         BotCommand(command="help", description="Help"),
         BotCommand(command="paysupport", description="Payment support"),
     ],

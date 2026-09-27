@@ -151,6 +151,8 @@ const ru = {
   "profile.country": "Страна",
   "profile.clan": "Клан",
   "profile.power": "Атака / оборона",
+  "profile.notify": "Уведомления о боях",
+  "profile.notify.hint": "Бот напишет, когда захватят твои секторы или заполнится хранилище",
 
   "map.home": "Мой город",
   "map.zoomIn": "Приблизь карту, чтобы увидеть секторы",
@@ -339,6 +341,8 @@ const en: Record<I18nKey, string> = {
   "profile.country": "Country",
   "profile.clan": "Clan",
   "profile.power": "Attack / defense",
+  "profile.notify": "Battle notifications",
+  "profile.notify.hint": "The bot messages you when your sectors are captured or storage is full",
 
   "map.home": "My city",
   "map.zoomIn": "Zoom in to see sectors",

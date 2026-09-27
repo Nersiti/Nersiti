@@ -84,6 +84,7 @@ async def act_on_sector(
         raise GameError("not_enough_power")
 
     prev_owner = sector.owner_clan_id
+    prev_actor = sector.last_actor_id
     user.coins -= amount
     user.last_action_at = now
     user.season_score += power
@@ -107,6 +108,7 @@ async def act_on_sector(
             power=power,
             flipped=outcome.flipped,
             prev_owner_clan_id=prev_owner,
+            prev_actor_id=prev_actor if outcome.flipped else None,
         )
     )
     if outcome.flipped:

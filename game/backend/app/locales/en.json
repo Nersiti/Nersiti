@@ -28,5 +28,17 @@
   "clan.not_owner": "Only the clan creator can change this.",
   "clan.group.none": "This chat has no clan yet. An admin can create one: send /newclan to the bot in private messages",
   "clan.group.status": "⚔️ <b>{title}</b>\n\nMembers: {members}\nSectors: {sectors}\nSeason points: {points}\nRank: #{rank}",
-  "clan.group.button": "⚔️ Join the clan"
+  "clan.group.button": "⚔️ Join the clan",
+  "notify.button": "⚔️ Open the map",
+  "notify.lost": "⚔️ Your sectors were captured! Lost: {n} ({cities}). Main enemy: clan «{clan}». Take them back!",
+  "notify.clan_losses": "🛡 Clan «{clan}» lost {n} sectors ({cities}). Your help is needed!",
+  "notify.digest": "📊 <b>Clan «{clan}» report</b> for the last 3 hours\n\nSectors captured: {won}\nLost: {lost}\nSectors held: {held}\nRank: #{rank}",
+  "notify.digest.button": "⚔️ Play for the clan",
+  "notify.storage_full": "💰 Your storage is full: {coins} coins are waiting. Collect them before income stops!",
+  "settings.text": "🔔 Battle and income notifications: <b>{state}</b>",
+  "settings.on": "on",
+  "settings.off": "off",
+  "settings.toggle_off": "🔕 Turn off",
+  "settings.toggle_on": "🔔 Turn on",
+  "settings.need_start": "Open the game first: /start"
 }

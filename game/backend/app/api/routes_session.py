@@ -2,13 +2,13 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_identity, limit
+from app.api.deps import get_identity, get_user_locked, limit
 from app.auth import TgIdentity
 from app.db import get_session
 from app.game import clan_service, player_service
 from app.game.state import build_config, build_state
 from app.i18n import pick_lang
-from app.models import Clan
+from app.models import Clan, User
 
 router = APIRouter()
 
@@ -55,3 +55,20 @@ async def create_session(
         "state": state,
         "config": build_config(),
     }
+
+
+class SettingsIn(BaseModel):
+    notify_enabled: bool | None = None
+
+
+@router.patch("/settings")
+async def update_settings(
+    body: SettingsIn,
+    user: User = Depends(get_user_locked),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    if body.notify_enabled is not None:
+        user.notify_enabled = body.notify_enabled
+    state = await build_state(session, user)
+    await session.commit()
+    return {"state": state}

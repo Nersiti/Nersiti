@@ -1,10 +1,33 @@
+import { useState } from "react";
+
+import { api } from "../api";
+import { toast } from "../components/Toast";
 import { compactNumber, formatNumber, t } from "../i18n";
 import { useStore } from "../store";
+import { haptic } from "../tg";
+import type { PlayerState } from "../types";
 import { flagEmoji } from "./Onboarding";
 
 export default function Profile() {
-  const state = useStore((s) => s.state);
+  const { state, setState } = useStore();
+  const [busy, setBusy] = useState(false);
   if (!state) return null;
+
+  const toggleNotify = async () => {
+    setBusy(true);
+    try {
+      const res = await api<{ state: PlayerState }>("/settings", {
+        method: "PATCH",
+        body: { notify_enabled: !state.notify_enabled },
+      });
+      haptic("select");
+      setState(res.state);
+    } catch {
+      toast("network", "error");
+    } finally {
+      setBusy(false);
+    }
+  };
   const rows: [string, string][] = [
     [t("profile.level"), String(state.level)],
     [t("profile.earned"), formatNumber(state.total_earned)],
@@ -31,6 +54,13 @@ export default function Profile() {
           </div>
         ))}
       </div>
+      <button className="kv toggle-row" disabled={busy} onClick={() => void toggleNotify()}>
+        <span className="grow">
+          <span className="menu-title">🔔 {t("profile.notify")}</span>
+          <span className="hint small">{t("profile.notify.hint")}</span>
+        </span>
+        <span className={`switch ${state.notify_enabled ? "on" : ""}`} />
+      </button>
     </div>
   );
 }

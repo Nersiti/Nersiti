@@ -9,8 +9,10 @@ import signal
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
+from app.bot.instance import get_bot
 from app.config import get_settings
 from app.worker import jobs
+from app.worker.notifications import Sender
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("worker")
@@ -26,6 +28,9 @@ def build_scheduler() -> AsyncIOScheduler:
     scheduler.add_job(jobs.hourly_control_points, "cron", minute=0, id="control_points")
     scheduler.add_job(jobs.season_check, "interval", minutes=5, id="season_check")
     scheduler.add_job(jobs.cleanup_battle_log, "cron", hour=3, minute=15, id="battle_log_cleanup")
+    scheduler.add_job(jobs.notify_sector_losses, "cron", minute="*/30", id="notify_losses")
+    scheduler.add_job(jobs.notify_group_digests, "cron", hour="*/3", minute=5, id="notify_digests")
+    scheduler.add_job(jobs.notify_storage_full, "cron", minute=20, id="notify_storage")
     return scheduler
 
 
@@ -40,8 +45,11 @@ async def main() -> None:
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGINT, signal.SIGTERM):
         loop.add_signal_handler(sig, stop.set)
+    sender = asyncio.create_task(Sender(get_bot()).run(stop))
     await stop.wait()
     scheduler.shutdown(wait=False)
+    await sender
+    await get_bot().session.close()
     log.info("worker stopped")
 
 

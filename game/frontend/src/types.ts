@@ -82,6 +82,7 @@ export interface PlayerState {
   attack_mult: number;
   defense_mult: number;
   vip_until: string | null;
+  notify_enabled: boolean;
   daily: DailyInfo;
   server_time: string;
 }

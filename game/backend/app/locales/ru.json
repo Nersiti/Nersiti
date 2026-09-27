@@ -28,5 +28,17 @@
   "clan.not_owner": "Только создатель клана может это менять.",
   "clan.group.none": "У этого чата пока нет клана. Администратор может создать его: напиши боту в личные сообщения /newclan",
   "clan.group.status": "⚔️ <b>{title}</b>\n\nУчастников: {members}\nСекторов: {sectors}\nОчков сезона: {points}\nМесто в рейтинге: #{rank}",
-  "clan.group.button": "⚔️ Вступить в клан"
+  "clan.group.button": "⚔️ Вступить в клан",
+  "notify.button": "⚔️ Открыть карту",
+  "notify.lost": "⚔️ Твои секторы захвачены! Потеряно: {n} ({cities}). Главный враг — клан «{clan}». Отбей их!",
+  "notify.clan_losses": "🛡 Клан «{clan}» потерял секторов: {n} ({cities}). Нужна твоя помощь!",
+  "notify.digest": "📊 <b>Сводка клана «{clan}»</b> за 3 часа\n\nЗахвачено секторов: {won}\nПотеряно: {lost}\nСекторов сейчас: {held}\nМесто в рейтинге: #{rank}",
+  "notify.digest.button": "⚔️ Играть за клан",
+  "notify.storage_full": "💰 Хранилище заполнено: {coins} монет ждут тебя. Забери их, пока доход не пропадает!",
+  "settings.text": "🔔 Уведомления о боях и доходе: <b>{state}</b>",
+  "settings.on": "включены",
+  "settings.off": "выключены",
+  "settings.toggle_off": "🔕 Выключить",
+  "settings.toggle_on": "🔔 Включить",
+  "settings.need_start": "Сначала открой игру: /start"
 }

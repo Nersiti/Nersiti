@@ -62,6 +62,7 @@ async def build_state(session: AsyncSession, user: User, now: datetime | None = 
         "attack_mult": economy.bp_to_mult(user.attack_bonus_bp),
         "defense_mult": economy.bp_to_mult(user.defense_bonus_bp),
         "vip_until": _iso(user.vip_until) if vip else None,
+        "notify_enabled": user.notify_enabled,
         "daily": {
             "streak": user.daily_streak,
             "claimed_today": claimed_today,

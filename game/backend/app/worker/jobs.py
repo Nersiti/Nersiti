@@ -8,6 +8,7 @@ from sqlalchemy import delete
 from app.db import get_sessionmaker
 from app.game import player_service, season_service
 from app.models import BattleLog
+from app.worker import notifications
 
 log = logging.getLogger("worker.jobs")
 
@@ -39,3 +40,21 @@ async def cleanup_battle_log() -> None:
         result = await session.execute(delete(BattleLog).where(BattleLog.created_at < cutoff))
         await session.commit()
     log.info("battle_log rows deleted: %s", result.rowcount)
+
+
+async def notify_sector_losses() -> None:
+    async with get_sessionmaker()() as session:
+        queued = await notifications.sector_loss_summary(session, player_service.utcnow())
+    log.info("loss notifications queued: %s", queued)
+
+
+async def notify_group_digests() -> None:
+    async with get_sessionmaker()() as session:
+        queued = await notifications.group_digests(session, player_service.utcnow())
+    log.info("group digests queued: %s", queued)
+
+
+async def notify_storage_full() -> None:
+    async with get_sessionmaker()() as session:
+        queued = await notifications.storage_full_reminders(session, player_service.utcnow())
+    log.info("storage reminders queued: %s", queued)
