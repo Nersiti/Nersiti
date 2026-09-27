@@ -10,6 +10,7 @@ from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.analytics import track
 from app.config import get_settings
 from app.game import economy, player_service
 from app.game.clan_service import MILITIA
@@ -245,6 +246,7 @@ async def process_successful_payment(
         else None
     )
     key = await grant(session, user, item, param, now, subscription_expiration=expiration)
+    track(session, "purchase", user.id, item=item.id, stars=payment.total_amount)
     return True, key
 
 

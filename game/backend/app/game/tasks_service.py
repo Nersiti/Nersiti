@@ -8,6 +8,7 @@ from sqlalchemy import or_, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.analytics import track
 from app.game import clan_service, player_service
 from app.game.errors import GameError
 from app.models import Task, User, UserTask
@@ -92,4 +93,5 @@ async def check_task(session: AsyncSession, user: User, task_id: int, now: datet
         insert(UserTask).values(user_id=user.id, task_id=task.id).on_conflict_do_nothing()
     )
     player_service.credit(user, task.reward)
+    track(session, "task_done", user.id, task=task.id)
     return task.reward

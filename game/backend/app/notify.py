@@ -32,11 +32,12 @@ async def enqueue(
     button: dict | None = None,
     user_id: int | None = None,
     now: datetime | None = None,
+    capped: bool = True,
 ) -> bool:
-    """Queues a message. Personal messages (user_id set) are capped per user per day.
-    Returns False if the message was dropped by the cap."""
+    """Queues a message. Personal messages (user_id set) are capped per user per day
+    unless capped=False (admin broadcasts). Returns False if dropped by the cap."""
     redis = get_redis()
-    if user_id is not None:
+    if user_id is not None and capped:
         day = (now or datetime.now(UTC)).strftime("%Y%m%d")
         key = f"notify:count:{user_id}:{day}"
         count = await redis.incr(key)

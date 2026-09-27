@@ -7,6 +7,7 @@ from fastapi.responses import Response
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.analytics import track
 from app.api.deps import get_user, limit
 from app.bot.instance import get_bot
 from app.db import get_session
@@ -63,6 +64,8 @@ async def prepare_message(
         allow_group_chats=True,
         allow_channel_chats=True,
     )
+    track(session, "share_message", user.id, kind=body.kind)
+    await session.commit()
     return {"id": prepared.id}
 
 

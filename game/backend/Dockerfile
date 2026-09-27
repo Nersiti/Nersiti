@@ -8,7 +8,7 @@ WORKDIR /app
 
 # DejaVu has Cyrillic glyphs for the share cards.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends fonts-dejavu-core postgresql-client \
+    && apt-get install -y --no-install-recommends fonts-dejavu-core \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .

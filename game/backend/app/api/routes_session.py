@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.analytics import track
 from app.api.deps import get_identity, get_user_locked, limit
 from app.auth import TgIdentity
 from app.db import get_session
@@ -36,6 +37,7 @@ async def create_session(
     now = player_service.utcnow()
     if created:
         await referral_service.on_registered(session, user)
+        track(session, "register", user.id, referrer=user.referrer_id, start=start_param)
     offline_earned = player_service.sync_user(user, now)
     await referral_service.check_level_bonus(session, user)
     await clan_service.recheck_subscription(session, user, now)

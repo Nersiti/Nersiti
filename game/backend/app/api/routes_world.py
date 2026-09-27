@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.analytics import track
 from app.api.deps import get_user, get_user_locked, limit
 from app.db import get_session
 from app.game import clan_service, player_service, world_service
@@ -62,6 +63,7 @@ async def onboarding(
     now = player_service.utcnow()
     await clan_service.join_militia(session, user, now)
     await _join_referrer_clan(session, user, now)
+    track(session, "onboarding", user.id, city=city.id, country=country)
     state = await build_state(session, user)
     await session.commit()
     return {"state": state}

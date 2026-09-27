@@ -32,6 +32,36 @@
 Проверка: `https://<домен>/api/health` должен отвечать `{"ok": true}`.
 Логи: `docker compose logs -f api worker`.
 
+## Бэкапы
+
+```bash
+chmod +x deploy/*.sh
+./deploy/backup.sh          # дамп в backups/, хранятся последние 7
+./deploy/restore_check.sh   # проверка: восстановить последний дамп во временную БД
+```
+Автоматически каждый день (на VPS: `crontab -e`):
+```
+15 4 * * * cd /opt/game && ./deploy/backup.sh >> backups/backup.log 2>&1
+```
+Полное восстановление (если сервер умер): поднять стек на новом VPS, затем
+`docker compose exec -T postgres pg_restore -U game -d game --clean --if-exists < backups/<файл>.dump`.
+Папку `backups/` стоит периодически копировать на хостинг или к себе (например, `rsync`).
+
+## Команды администратора (в личке с ботом, твой ID в `ADMIN_IDS`)
+- `/admin` — список команд, `/stats` — игроки, DAU/WAU/MAU, выручка Stars, реклама.
+- `/suspects`, `/ban <id>`, `/unban <id>`, `/ban_clan <id>` — модерация.
+- `/broadcast <текст>` — рассылка всем (с подтверждением).
+- `/task_add @канал <награда> <кол-во|0> <название>`, `/task_link <url> <награда> <название>`, `/tasks`, `/task_off <id>`.
+- Заявки рекламодателей из `/promote` приходят сюда с кнопками «Одобрить / Отклонить и вернуть звёзды».
+- `/combo_set today market walls barracks` — комбо дня; `/season_end` — завершить сезон вручную.
+- `/gifts`, `/gift <user_id> <gift_id>` — подарки Telegram победителям (оплачиваются звёздами бота).
+- `/refund <charge_id>` — вернуть звёзды за покупку.
+
+## Реклама Adsgram
+1. Зарегистрируйся на adsgram.ai, создай блок типа Reward для своего бота, получи `blockId`.
+2. В настройках блока укажи Reward URL: `https://<домен>/api/ads/callback?userid=[userId]&secret=<ADS_CALLBACK_SECRET>`.
+3. Впиши `ADSGRAM_BLOCK_ID` и `ADS_CALLBACK_SECRET` в `.env` и перезапусти `docker compose up -d`.
+
 ## Локальная разработка
 
 Нужны Python 3.11+, Node 22, PostgreSQL 16 и Redis 7.
