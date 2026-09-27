@@ -239,3 +239,32 @@ export interface ShopInfo {
   is_clan_owner: boolean;
   vip_shield_available: boolean;
 }
+
+export interface TaskInfo {
+  id: number;
+  kind: "channel_sub" | "link";
+  title: string;
+  url: string;
+  reward: number;
+  completed: boolean;
+}
+
+export interface TasksResponse {
+  tasks: TaskInfo[];
+  ads: {
+    enabled: boolean;
+    block_id: string | null;
+    views_today: number;
+    daily_limit: number;
+    passive_reward: number;
+  };
+}
+
+export interface ReferralSummary {
+  link: string;
+  count: number;
+  invitees: { id: number; first_name: string; level: number; is_premium: boolean }[];
+  pending_bonus: number;
+  claim_in_seconds: number | null;
+  rewards: { invitee: number; inviter: number; inviter_premium: number; level3: number; mentor_share: number };
+}

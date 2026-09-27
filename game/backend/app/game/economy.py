@@ -223,3 +223,31 @@ def season_player_reward(place: int) -> int:
     if place <= len(SEASON_PLAYER_REWARDS):
         return SEASON_PLAYER_REWARDS[place - 1]
     return SEASON_TOP100_REWARD if place <= SEASON_TOP_PLAYERS else 0
+
+
+# --- Referrals, tasks, ads (PLAN.md, section B) -------------------------------------
+
+REF_INVITEE_BONUS = 5_000
+REF_INVITER_BONUS = 5_000
+REF_INVITER_PREMIUM_BONUS = 25_000
+REF_LEVEL3_BONUS = 25_000
+REF_LEVEL_FOR_BONUS = 3
+REF_MENTOR_SHARE = 0.05
+REF_CLAIM_INTERVAL_SECONDS = 3600
+
+AD_DAILY_LIMIT = 10
+AD_PASSIVE_MINUTES = 30
+AD_PASSIVE_MIN_COINS = 1_000
+AD_ATTACK_MULTIPLIER = 1.5
+
+# Self-serve advertising: (subscribers, stars). Players get PROMO_TASK_REWARD per join.
+PROMO_PACKAGES = [(100, 150), (500, 600), (1000, 1000)]
+PROMO_TASK_REWARD = 5_000
+
+
+def mentor_bonus(passive_delta_total: int) -> int:
+    return math.floor(max(0, passive_delta_total) * REF_MENTOR_SHARE)
+
+
+def ad_passive_reward(income_per_hour: int) -> int:
+    return max(AD_PASSIVE_MIN_COINS, income_per_hour * AD_PASSIVE_MINUTES // 60)

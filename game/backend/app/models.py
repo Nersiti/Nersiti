@@ -222,6 +222,7 @@ class Task(Base):
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     sponsor_user_id: Mapped[int | None] = mapped_column(BigInteger)
     stars_paid: Mapped[int] = mapped_column(Integer, default=0)
+    payment_charge_id: Mapped[str | None] = mapped_column(String(128))
     created_at: Mapped[datetime] = _now_col()
 
 

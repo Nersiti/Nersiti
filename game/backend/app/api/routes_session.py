@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_identity, get_user_locked, limit
 from app.auth import TgIdentity
 from app.db import get_session
-from app.game import clan_service, player_service
+from app.game import clan_service, player_service, referral_service
 from app.game.state import build_config, build_state
 from app.i18n import pick_lang
 from app.models import Clan, User
@@ -34,7 +34,10 @@ async def create_session(
         await session.commit()
         raise HTTPException(status_code=403, detail="banned")
     now = player_service.utcnow()
+    if created:
+        await referral_service.on_registered(session, user)
     offline_earned = player_service.sync_user(user, now)
+    await referral_service.check_level_bonus(session, user)
     await clan_service.recheck_subscription(session, user, now)
 
     invite_clan = None

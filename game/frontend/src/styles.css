@@ -1152,3 +1152,72 @@ button {
   border-radius: 12px;
   box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.15);
 }
+
+/* ---------- Tasks / referrals ---------- */
+.ref-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border-radius: var(--radius);
+  background: var(--bg2);
+}
+
+.ref-card p {
+  margin: 0;
+  line-height: 1.45;
+}
+
+.ref-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ref-bonus {
+  color: var(--gold);
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.small-btn {
+  padding: 8px 12px;
+  font-size: 13px;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+
+.invitees {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chip {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--bg);
+  font-size: 12px;
+}
+
+.share-row.three {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.share-row.three .share-btn {
+  font-size: 13px;
+  padding: 10px 4px;
+}
+
+.task-row .grow {
+  min-width: 0;
+}
+
+.task-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--bg2);
+}

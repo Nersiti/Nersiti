@@ -7,6 +7,7 @@ from app.api import (
     routes_map,
     routes_session,
     routes_shop,
+    routes_tasks,
     routes_world,
 )
 
@@ -20,4 +21,5 @@ def build_api_router() -> APIRouter:
     router.include_router(routes_map.router)
     router.include_router(routes_leaderboard.router)
     router.include_router(routes_shop.router)
+    router.include_router(routes_tasks.router)
     return router

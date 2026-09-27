@@ -124,7 +124,9 @@ async def cmd_newclan(message: Message) -> None:
     await send_newclan_prompt(message)
 
 
-@router.message(F.chat_shared, F.chat.type == "private")
+@router.message(
+    F.chat_shared.request_id.in_({REQUEST_CHANNEL, REQUEST_GROUP}), F.chat.type == "private"
+)
 async def on_chat_shared(message: Message, bot: Bot) -> None:
     shared = message.chat_shared
     user = message.from_user

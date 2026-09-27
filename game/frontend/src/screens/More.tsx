@@ -6,7 +6,7 @@ import { haptic, webApp } from "../tg";
 import Leaderboard from "./Leaderboard";
 import Profile from "./Profile";
 import Shop from "./Shop";
-import Soon from "./Soon";
+import Tasks from "./Tasks";
 
 const ITEMS: { id: MoreScreen; icon: string }[] = [
   { id: "leaderboard", icon: "🏆" },
@@ -68,7 +68,7 @@ export default function More() {
       )}
       {more === "leaderboard" && <Leaderboard />}
       {more === "profile" && <Profile />}
-      {more === "tasks" && <Soon icon="🎯" />}
+      {more === "tasks" && <Tasks />}
       {more === "shop" && <Shop />}
     </>
   );

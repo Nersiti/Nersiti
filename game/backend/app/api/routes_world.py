@@ -7,7 +7,7 @@ from app.db import get_session
 from app.game import clan_service, player_service, world_service
 from app.game.state import build_state
 from app.i18n import pick_lang
-from app.models import City, User
+from app.models import City, Clan, User
 
 router = APIRouter()
 
@@ -59,7 +59,23 @@ async def onboarding(
 
     user.country_code = country
     user.city_id = city.id
-    await clan_service.join_militia(session, user, player_service.utcnow())
+    now = player_service.utcnow()
+    await clan_service.join_militia(session, user, now)
+    await _join_referrer_clan(session, user, now)
     state = await build_state(session, user)
     await session.commit()
     return {"state": state}
+
+
+async def _join_referrer_clan(session: AsyncSession, user: User, now) -> None:
+    """Invited players start in their inviter's clan (unless it is a militia or
+    subscribers-only: then the invite sheet handles it)."""
+    if user.referrer_id is None:
+        return
+    inviter = await session.get(User, user.referrer_id)
+    if inviter is None or inviter.clan_id is None:
+        return
+    clan = await session.get(Clan, inviter.clan_id)
+    if clan is None or clan.banned or clan.kind == clan_service.MILITIA or clan.subscribers_only:
+        return
+    await clan_service.join_clan(session, user, clan.id, now)

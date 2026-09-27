@@ -74,6 +74,10 @@ async def act_on_sector(
         power = economy.action_power(amount, economy.bp_to_mult(user.defense_bonus_bp), False)
     else:
         mult = attack_mult(user, await artillery_active(session, user.id, now))
+        ad_boost = await session.get(UserBoost, (user.id, "ad_attack"), with_for_update=True)
+        if ad_boost is not None and ad_boost.until is not None and ad_boost.until > now:
+            mult *= economy.AD_ATTACK_MULTIPLIER
+            ad_boost.until = None  # one-shot
         power = economy.action_power(amount, mult, foothold)
 
     defense_now = economy.decayed_defense(sector.defense, sector.defense_updated_at, now)

@@ -5,8 +5,9 @@ import logging
 from aiogram import F, Router
 from aiogram.types import Message, PreCheckoutQuery
 
+from app.bot.handlers.promote import notify_admins
 from app.db import get_sessionmaker
-from app.game import player_service, shop_service
+from app.game import player_service, promo_service, shop_service
 from app.game.errors import GameError
 from app.i18n import pick_lang, t
 from app.models import User
@@ -19,6 +20,22 @@ router = Router()
 async def on_pre_checkout(query: PreCheckoutQuery) -> None:
     """Must be answered within 10 seconds."""
     lang = pick_lang(query.from_user.language_code)
+    if promo_service.is_promo_payload(query.invoice_payload):
+        try:
+            user_id, _chat_id, idx = promo_service.parse_payload(query.invoice_payload)
+            _subs, stars = promo_service.package(idx)
+            ok = (
+                user_id == query.from_user.id
+                and query.currency == "XTR"
+                and query.total_amount == stars
+            )
+        except GameError:
+            ok = False
+        if ok:
+            await query.answer(ok=True)
+        else:
+            await query.answer(ok=False, error_message=t(lang, "payment.error"))
+        return
     try:
         item, user_id, param = shop_service.parse_payload(query.invoice_payload)
         if query.currency != "XTR" or query.total_amount != item.stars:
@@ -41,6 +58,16 @@ async def on_pre_checkout(query: PreCheckoutQuery) -> None:
 async def on_successful_payment(message: Message) -> None:
     payment = message.successful_payment
     lang = pick_lang(message.from_user.language_code)
+    if promo_service.is_promo_payload(payment.invoice_payload):
+        async with get_sessionmaker()() as session:
+            task = await promo_service.process_payment(
+                session, message.from_user.id, payment, player_service.utcnow()
+            )
+            await session.commit()
+        if task is not None:
+            await message.answer(t(lang, "promote.paid"))
+            await notify_admins(message.bot, task, message.from_user.full_name)
+        return
     async with get_sessionmaker()() as session:
         granted, key = await shop_service.process_successful_payment(
             session, message.from_user.id, payment, player_service.utcnow()

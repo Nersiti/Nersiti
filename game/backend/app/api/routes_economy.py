@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_user_locked, limit
 from app.db import get_session
-from app.game import economy, player_service
+from app.game import economy, player_service, referral_service
 from app.game.cards import CARDS
 from app.game.state import build_state
 from app.models import User
@@ -23,8 +23,11 @@ async def tap(
     session: AsyncSession = Depends(get_session),
 ) -> dict:
     now = player_service.utcnow()
+    level_before = user.level
     player_service.sync_user(user, now)
     earned = player_service.tap(user, body.taps, now)
+    if user.level != level_before:
+        await referral_service.check_level_bonus(session, user)
     state = await build_state(session, user, now)
     await session.commit()
     return {"earned": earned, "state": state}

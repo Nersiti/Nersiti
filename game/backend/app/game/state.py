@@ -80,4 +80,5 @@ def build_config() -> dict:
         "game_name": settings.game_name,
         "bot_username": settings.bot_username,
         "max_taps_per_sec": economy.MAX_TAPS_PER_SEC,
+        "ads_block_id": settings.adsgram_block_id or None,
     }
