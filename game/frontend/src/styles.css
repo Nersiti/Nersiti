@@ -62,3 +62,15 @@ button {
   margin: 0;
   color: var(--hint);
 }
+
+.btn {
+  background: var(--accent);
+  color: var(--accent-text);
+  padding: 12px 20px;
+  border-radius: var(--radius);
+  font-weight: 600;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+}

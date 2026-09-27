@@ -57,6 +57,41 @@ class MockSession(BaseSession):
         return [c for c in self.calls if type(c).__name__ == name]
 
 
+@pytest.fixture(scope="session")
+async def _schema() -> AsyncIterator[None]:
+    from app import models  # noqa: F401
+    from app.db import Base, dispose_engine, get_engine
+    from app.redis_client import close_redis
+
+    async with get_engine().begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
+        await conn.run_sync(Base.metadata.create_all)
+    yield
+    await close_redis()
+    await dispose_engine()
+
+
+@pytest.fixture(autouse=True)
+async def _clean_state(_schema) -> None:
+    from sqlalchemy import text
+
+    from app.db import Base, get_engine
+    from app.redis_client import get_redis
+
+    tables = ", ".join(t.name for t in Base.metadata.sorted_tables)
+    async with get_engine().begin() as conn:
+        await conn.execute(text(f"TRUNCATE {tables} RESTART IDENTITY CASCADE"))
+    await get_redis().flushdb()
+
+
+@pytest.fixture
+async def db():
+    from app.db import get_sessionmaker
+
+    async with get_sessionmaker()() as session:
+        yield session
+
+
 @pytest.fixture
 def bot_session() -> MockSession:
     from app.bot.instance import get_bot
