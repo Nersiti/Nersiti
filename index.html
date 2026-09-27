@@ -1,70 +1,116 @@
 <!DOCTYPE html>
-<html style="color:red">
-  <head>
-    <title>Nersiti</title>
-    <meta charset="utf-8">
-    <meta name="Nersiti" content="мой сайт, html, Nersiti">
-    <meta name="description" content="Это игровой сайт,на нем вы найдете множество игр">
-    <link rel="shortcut icon" href="https://atom.io/favicon.ico">
-    <link rel="stylesheet" href="style.css">
-    <style>
-     table {
-       color:blue
-     }
-   </style>
-  </head>
-  <body>
-<h1 class="pocka" >5555555555555555[(NERSITI)]5555555555555555</h1>
-  <h2 class="privet">Халлоу ребзи, пока-что на этом сайте я буду только <br> покачто выкладывать ссылки на разные,крутые игры <br> конечно-же сайт будет расти,идти в верх! <br> и может быть станет популярным (но это не точно)</h2>
-  <h2 style="color:blue">Ваши подсказки для улучшения пресылайте мне в <a href="https://vk.com/id571139457" target="_blank">вк</h2>
-    <a class="tim"> Это игра<a href="https://moreigr.com/online-games/3505-dota-2.html" target="_blank">Dota 2</a>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Nersiti — ссылки на крутые игры</title>
+  <meta name="description" content="Nersiti — игровой сайт: подборка ссылок на крутые игры для ПК, телефона и консолей.">
+  <meta name="keywords" content="Nersiti, игры, онлайн игры, бесплатные игры, подборка игр">
+  <meta name="theme-color" content="#0d0e1a">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Nersiti">
+  <meta property="og:description" content="Подборка ссылок на крутые игры.">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Russo+One&display=swap">
+  <link rel="stylesheet" href="style.css">
+  <script src="games.js" defer></script>
+  <script src="script.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#games">Перейти к играм</a>
 
-    <br>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="logo" href="#top"><span>[</span> NERSITI <span>]</span></a>
+      <nav class="nav" aria-label="Главное меню">
+        <a href="#games">Игры</a>
+        <a href="#about">О сайте</a>
+        <a href="#contact">Связь</a>
+      </nav>
+    </div>
+  </header>
 
-<ul class="list">
-  <li height="90">Первый элемент списка</li>
-  <li>Второй элемент списка</li>
-  <li> <a href="https://ya.ru" target="_blank">Yandex</a> Главнная страница</li>
+  <main id="top">
+    <section class="hero">
+      <div class="container">
+        <p class="hero-tag">Игровой сайт</p>
+        <h1 class="hero-title">NERSITI</h1>
+        <p class="hero-text">
+          Халлоу, ребзи! Пока что на этом сайте я буду выкладывать ссылки на разные крутые игры.
+          Конечно же, сайт будет расти и идти вверх — и, может быть, станет популярным (но это не точно).
+        </p>
+        <div class="hero-actions">
+          <a class="btn btn-primary" href="#games">Смотреть игры</a>
+          <button class="btn btn-ghost" type="button" id="random-game">Случайная игра</button>
+        </div>
+      </div>
+    </section>
 
-  </ul>
+    <section class="section" id="games" aria-labelledby="games-title">
+      <div class="container">
+        <div class="section-head">
+          <h2 id="games-title">Игры</h2>
+          <p class="section-sub" id="games-count" aria-live="polite"></p>
+        </div>
 
-<hr>
+        <div class="filters">
+          <label class="search">
+            <span class="visually-hidden">Поиск игры</span>
+            <input type="search" id="search" placeholder="Найти игру…" autocomplete="off">
+          </label>
+          <label class="toggle">
+            <input type="checkbox" id="free-only">
+            <span>Только бесплатные</span>
+          </label>
+          <div class="chips" id="genres" role="group" aria-label="Жанр"></div>
+        </div>
 
-<table border="2">
-  <thead>
-    <tr>
-    <th height="50">Название фрукта</th>
-    <th>Кол-во</th>
-    </tr>
-    <tbody>
-    <tfoot>
-      <tr>
-        <td>Яблоко</td>
-        <td>17</td>
-      </tr>
-    <td>Апельсин</td>
-    <td>24</td>
-    <td colspan="2">Итог: ?</td>
-    </tfoot>
-    </tbody>
-    <tfoot>
-      <tr>
-      </tr>
-    </tfoot>
-  </thead>
-</table>
-<form class="" action="index.html" method="post">
-  <input type="numbers">
-  <input type="submit" name="" value="Отправить">
-</form>
+        <ul class="games-grid" id="games-list"></ul>
 
+        <p class="empty" id="games-empty" hidden>
+          Ничего не нашлось. Попробуй другой запрос или <a href="#contact">предложи игру</a>.
+        </p>
+        <noscript>
+          <p class="empty">Чтобы увидеть список игр, включи JavaScript в браузере.</p>
+        </noscript>
+      </div>
+    </section>
 
-<div class="privet">
+    <section class="section section-alt" id="about" aria-labelledby="about-title">
+      <div class="container about">
+        <div>
+          <h2 id="about-title">О сайте</h2>
+          <p>
+            Nersiti — это подборка игр, в которые реально стоит поиграть.
+            Все ссылки ведут на официальные сайты игр — никаких левых установщиков.
+          </p>
+        </div>
+        <ul class="features">
+          <li><strong>Только официальные ссылки</strong>Качай игры спокойно, прямо у разработчиков.</li>
+          <li><strong>Для ПК и телефона</strong>У каждой игры указано, где в неё можно поиграть.</li>
+          <li><strong>Список растёт</strong>Новые игры появляются регулярно — заглядывай почаще.</li>
+        </ul>
+      </div>
+    </section>
 
-</div>
+    <section class="section" id="contact" aria-labelledby="contact-title">
+      <div class="container">
+        <div class="contact-card">
+          <h2 id="contact-title">Есть идея?</h2>
+          <p>Ваши подсказки для улучшения и игры, которые стоит добавить, присылайте мне в ВК.</p>
+          <a class="btn btn-primary" href="https://vk.com/id571139457" target="_blank" rel="noopener noreferrer">Написать в ВК</a>
+        </div>
+      </div>
+    </section>
+  </main>
 
-<a class="font-size-md color-red" href="#">Первая ссылка</a>
-<br>
-<a class="font-size-md color-gray" href="#">Вторая ссылка</a>
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <p>© <span id="year">2026</span> Nersiti</p>
+      <a href="#top">Наверх ↑</a>
+    </div>
+  </footer>
 </body>
-  </html>
+</html>
