@@ -220,3 +220,22 @@ export interface Leaderboard<T> {
   items: T[];
   me: { rank: number | null; score?: number } | null;
 }
+
+export interface ShopItemInfo {
+  id: string;
+  stars: number;
+  daily_limit: number | null;
+  used_today: number;
+  param: "none" | "sector" | "color";
+  subscription: boolean;
+  clan_owner_only: boolean;
+  available: boolean;
+}
+
+export interface ShopInfo {
+  items: ShopItemInfo[];
+  palette: string[];
+  coins_bag_amount: number;
+  is_clan_owner: boolean;
+  vip_shield_available: boolean;
+}

@@ -29,6 +29,8 @@ interface Store {
   seasonAt: number;
 
   load: () => Promise<void>;
+  /** Re-reads the player state from the server (e.g. after a Stars payment). */
+  refresh: () => Promise<void>;
   setState: (state: PlayerState) => void;
   setTab: (tab: Tab) => void;
   setMore: (screen: MoreScreen) => void;
@@ -71,6 +73,15 @@ export const useStore = create<Store>((set, get) => ({
       });
     } catch (e) {
       set({ status: "error", error: e instanceof ApiError ? e.code : "network" });
+    }
+  },
+
+  refresh: async () => {
+    try {
+      const res = await api<SessionResponse>("/session", { body: {} });
+      set({ state: res.state, syncedAt: Date.now() });
+    } catch {
+      /* keep the current state */
     }
   },
 

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api, ApiError } from "../api";
 import { useLiveBalance } from "../hooks";
 import { compactNumber, formatNumber, getLang, t, type I18nKey } from "../i18n";
+import { purchase, shopErrorText } from "../shop";
 import { useStore, withFlushedTaps } from "../store";
 import { haptic } from "../tg";
 import type { PlayerState, SectorActionResult, SectorDetails } from "../types";
@@ -63,7 +64,18 @@ export default function SectorSheet(props: { h3: string | null; onClose: () => v
       {!sector ? (
         <div className="hint">{t("app.loading")}</div>
       ) : (
-        <SectorBody sector={sector} amount={amount} share={share} setShare={setShare} busy={busy} onAct={act} />
+        <>
+          <SectorBody sector={sector} amount={amount} share={share} setShare={setShare} busy={busy} onAct={act} />
+          {sector.is_own && (
+            <ShieldActions
+              sector={sector}
+              onDone={() => {
+                props.onChanged();
+                void load(sector.h3);
+              }}
+            />
+          )}
+        </>
       )}
     </Sheet>
   );
@@ -193,5 +205,46 @@ function SectorBody(props: {
         </>
       )}
     </>
+  );
+}
+
+function ShieldActions(props: { sector: SectorDetails; onDone: () => void }) {
+  const { state, setState } = useStore();
+  const [busy, setBusy] = useState(false);
+  const vip = !!state?.vip_until;
+
+  const freeShield = async () => {
+    setBusy(true);
+    try {
+      const res = await api<{ state: PlayerState }>("/shop/vip_shield", { body: { h3: props.sector.h3 } });
+      setState(res.state);
+      haptic("success");
+      toast(t("sector.shield.done"), "success");
+      props.onDone();
+    } catch (e) {
+      haptic("error");
+      toast(shopErrorText(e instanceof ApiError ? e.code : "network"), "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="row-actions">
+      <button
+        className="btn btn-secondary"
+        disabled={busy}
+        onClick={async () => {
+          if (await purchase("shield", props.sector.h3)) setTimeout(props.onDone, 1600);
+        }}
+      >
+        {t("sector.shield.buy")}
+      </button>
+      {vip && (
+        <button className="btn" disabled={busy} onClick={() => void freeShield()}>
+          {t("sector.shield.vip")}
+        </button>
+      )}
+    </div>
   );
 }

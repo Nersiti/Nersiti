@@ -122,3 +122,11 @@ export function confirmDialog(message: string): Promise<boolean> {
   if (wa) return new Promise((resolve) => wa.showConfirm(message, (ok) => resolve(ok)));
   return Promise.resolve(window.confirm(message));
 }
+
+/** Opens a Stars invoice; resolves with Telegram's final status. */
+export function openInvoice(link: string): Promise<"paid" | "cancelled" | "failed" | "pending"> {
+  const wa = webApp();
+  if (wa?.openInvoice) return new Promise((resolve) => wa.openInvoice!(link, resolve));
+  window.open(link, "_blank");
+  return Promise.resolve("pending");
+}

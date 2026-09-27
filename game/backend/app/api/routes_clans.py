@@ -33,7 +33,22 @@ async def top_clans(
         .scalars()
         .all()
     )
-    return {"items": [await clan_service.clan_summary(session, c, lang) for c in clans]}
+    promoted = (
+        (
+            await session.execute(
+                select(Clan)
+                .where(Clan.banned.is_(False), Clan.promoted_until > player_service.utcnow())
+                .order_by(Clan.promoted_until.desc())
+                .limit(5)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    return {
+        "items": [await clan_service.clan_summary(session, c, lang) for c in clans],
+        "promoted": [await clan_service.clan_summary(session, c, lang) for c in promoted],
+    }
 
 
 @router.get("/clans/{clan_id}")

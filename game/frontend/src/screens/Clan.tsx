@@ -6,13 +6,17 @@ import Sheet from "../components/Sheet";
 import { toast } from "../components/Toast";
 import { compactNumber, t } from "../i18n";
 import { useStore } from "../store";
+import { purchase } from "../shop";
 import { confirmDialog, haptic, openTgLink, shareLink } from "../tg";
-import type { ClanDetails, ClanSummary, PlayerState } from "../types";
+import type { ClanDetails, ClanSummary, PlayerState, ShopInfo } from "../types";
+import { ColorSheet } from "./Shop";
 
 export default function Clan() {
   const { state, config, setState } = useStore();
   const [mine, setMine] = useState<ClanDetails | null>(null);
   const [top, setTop] = useState<ClanSummary[]>([]);
+  const [promoted, setPromoted] = useState<ClanSummary[]>([]);
+  const [palette, setPalette] = useState<string[] | null>(null);
   const [selected, setSelected] = useState<number | null>(null);
   const clanId = state?.clan?.id;
 
@@ -20,10 +24,11 @@ export default function Clan() {
     if (!clanId) return;
     const [details, list] = await Promise.all([
       api<ClanDetails>(`/clans/${clanId}`),
-      api<{ items: ClanSummary[] }>("/clans/top?limit=50"),
+      api<{ items: ClanSummary[]; promoted: ClanSummary[] }>("/clans/top?limit=50"),
     ]);
     setMine(details);
     setTop(list.items);
+    setPromoted(list.promoted);
   }, [clanId]);
 
   useEffect(() => {
@@ -79,6 +84,26 @@ export default function Clan() {
               </button>
             </div>
           )}
+          {mine.is_owner && !mine.is_militia && (
+            <div className="row-actions">
+              <button
+                className="btn btn-secondary"
+                onClick={() =>
+                  void api<ShopInfo>("/shop").then((info) => setPalette(info.palette))
+                }
+              >
+                {t("clan.owner.color")}
+              </button>
+              <button
+                className="btn btn-secondary"
+                onClick={async () => {
+                  if (await purchase("clan_promo")) setTimeout(() => void reload(), 1600);
+                }}
+              >
+                {t("clan.owner.promo")}
+              </button>
+            </div>
+          )}
           {mine.top_members.length > 0 && (
             <>
               <div className="section-title">{t("clan.topMembers")}</div>
@@ -109,12 +134,33 @@ export default function Clan() {
         </button>
       </div>
 
+      {promoted.length > 0 && (
+        <>
+          <div className="section-title">{t("clan.promoted")}</div>
+          <div className="list-plain">
+            {promoted.map((c) => (
+              <ClanRow key={c.id} clan={c} mine={c.id === clanId} onClick={() => setSelected(c.id)} />
+            ))}
+          </div>
+        </>
+      )}
+
       <div className="section-title">{t("clan.top")}</div>
       <div className="list-plain">
         {top.map((c, i) => (
           <ClanRow key={c.id} clan={c} index={i} mine={c.id === clanId} onClick={() => setSelected(c.id)} />
         ))}
       </div>
+
+      <ColorSheet
+        open={palette !== null}
+        colors={palette ?? []}
+        onClose={() => setPalette(null)}
+        onPick={async (color) => {
+          setPalette(null);
+          if (await purchase("clan_color", color)) setTimeout(() => void reload(), 1600);
+        }}
+      />
 
       <ClanSheet
         clanId={selected}
