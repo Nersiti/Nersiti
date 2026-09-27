@@ -6,6 +6,7 @@ from app.api import (
     routes_leaderboard,
     routes_map,
     routes_session,
+    routes_share,
     routes_shop,
     routes_tasks,
     routes_world,
@@ -22,4 +23,5 @@ def build_api_router() -> APIRouter:
     router.include_router(routes_leaderboard.router)
     router.include_router(routes_shop.router)
     router.include_router(routes_tasks.router)
+    router.include_router(routes_share.router)
     return router

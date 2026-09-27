@@ -316,6 +316,7 @@ button {
 
 .daily-label {
   font-size: 10px;
+  white-space: nowrap;
   color: var(--hint);
   margin-top: 3px;
 }
@@ -1220,4 +1221,19 @@ button {
   padding: 12px;
   border-radius: 12px;
   background: var(--bg2);
+}
+
+/* ---------- Share ---------- */
+.share-preview {
+  width: 100%;
+  border-radius: 12px;
+  aspect-ratio: 1200 / 630;
+  object-fit: cover;
+  background: var(--bg);
+}
+
+.share-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }

@@ -1,6 +1,7 @@
 import { useRef, useState, type CSSProperties, type PointerEvent } from "react";
 
 import { api, ApiError } from "../api";
+import ShareSheet from "../components/ShareSheet";
 import Sheet from "../components/Sheet";
 import { toast } from "../components/Toast";
 import { useLiveBalance, useNow } from "../hooks";
@@ -25,6 +26,7 @@ export default function Hq() {
   const [floats, setFloats] = useState<Float[]>([]);
   const [pressed, setPressed] = useState(false);
   const [dailyOpen, setDailyOpen] = useState(false);
+  const [sharing, setSharing] = useState(false);
   const noEnergyToastAt = useRef(0);
 
   if (!state) return null;
@@ -57,6 +59,10 @@ export default function Hq() {
           <div className="hq-name">{state.user.first_name}</div>
           <div className="hint">📍 {state.city?.name}</div>
         </div>
+        <button className="daily-btn" onClick={() => setSharing(true)}>
+          📣
+          <span className="daily-label">{t("share.me")}</span>
+        </button>
         <button className="daily-btn" onClick={() => setDailyOpen(true)}>
           🎁
           {!state.daily.claimed_today && <span className="dot" />}
@@ -142,6 +148,7 @@ export default function Hq() {
         </div>
       </Sheet>
 
+      <ShareSheet kind="me" open={sharing} onClose={() => setSharing(false)} />
       <DailySheet open={dailyOpen} onClose={() => setDailyOpen(false)} state={state} />
     </div>
   );

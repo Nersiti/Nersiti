@@ -31,6 +31,10 @@ def build_scheduler() -> AsyncIOScheduler:
     scheduler.add_job(jobs.notify_sector_losses, "cron", minute="*/30", id="notify_losses")
     scheduler.add_job(jobs.notify_group_digests, "cron", hour="*/3", minute=5, id="notify_digests")
     scheduler.add_job(jobs.notify_storage_full, "cron", minute=20, id="notify_storage")
+    scheduler.add_job(
+        jobs.notify_weekly_results, "cron", day_of_week="mon", hour=12, minute=10, id="weekly"
+    )
+    scheduler.add_job(jobs.hourly_map_snapshot, "cron", minute=2, id="map_snapshot")
     return scheduler
 
 

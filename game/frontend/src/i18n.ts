@@ -218,6 +218,14 @@ const ru = {
   "tasks.err.task_done": "Задание уже выполнено",
   "tasks.err.task_not_found": "Задание больше не доступно",
 
+  "share.title": "Поделиться",
+  "share.story": "📸 В сторис",
+  "share.chat": "💬 В чат",
+  "share.link": "🔗 Ссылкой",
+  "share.unavailable": "Обнови Telegram, чтобы делиться этим способом",
+  "share.me": "Позвать в игру",
+  "share.clan": "Позвать в клан",
+
   "profile.notify": "Уведомления о боях",
   "profile.notify.hint": "Бот напишет, когда захватят твои секторы или заполнится хранилище",
 
@@ -474,6 +482,14 @@ const en: Record<I18nKey, string> = {
   "tasks.err.not_subscribed": "Subscription not found — subscribe and tap Check",
   "tasks.err.task_done": "Task already completed",
   "tasks.err.task_not_found": "Task is no longer available",
+
+  "share.title": "Share",
+  "share.story": "📸 To story",
+  "share.chat": "💬 To a chat",
+  "share.link": "🔗 As a link",
+  "share.unavailable": "Update Telegram to share this way",
+  "share.me": "Invite to the game",
+  "share.clan": "Invite to the clan",
 
   "profile.notify": "Battle notifications",
   "profile.notify.hint": "The bot messages you when your sectors are captured or storage is full",

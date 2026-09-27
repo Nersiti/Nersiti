@@ -93,5 +93,18 @@
   "admin.task.created": "Задание #{id} создано.",
   "admin.task.bot_not_admin": "Бот должен быть администратором канала.",
   "admin.task.off": "Задание #{id} выключено.",
-  "admin.task.none": "Активных заданий нет."
+  "admin.task.none": "Активных заданий нет.",
+  "share.me.city": "воюет за {city}",
+  "share.me.clan": "Клан «{clan}»",
+  "share.me.cta": "Присоединяйся — захватим город!",
+  "share.me.text": "⚔️ Я воюю за свой город в «Битве за Мир». Присоединяйся — держи бонус на старте!",
+  "share.clan.line": "штаб: {city}",
+  "share.clan.cta": "Вступай в наш клан!",
+  "share.clan.text": "⚔️ Наш клан захватывает карту мира в «Битве за Мир». Вступай и воюй с нами!",
+  "share.stat.rank": "место клана",
+  "share.stat.sectors": "секторов",
+  "share.stat.level": "уровень",
+  "share.stat.members": "бойцов",
+  "share.button": "⚔️ Играть",
+  "notify.weekly": "🏆 <b>Итоги недели клана «{clan}»</b>\n\nЗахвачено секторов: {won}\nПотеряно: {lost}\nСекторов сейчас: {held}\nМесто в рейтинге: #{rank}\nЛучший боец: {best}"
 }

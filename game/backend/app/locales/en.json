@@ -93,5 +93,18 @@
   "admin.task.created": "Task #{id} created.",
   "admin.task.bot_not_admin": "The bot must be an admin of the channel.",
   "admin.task.off": "Task #{id} switched off.",
-  "admin.task.none": "No active tasks."
+  "admin.task.none": "No active tasks.",
+  "share.me.city": "fights for {city}",
+  "share.me.clan": "Clan «{clan}»",
+  "share.me.cta": "Join me — let's capture the city!",
+  "share.me.text": "⚔️ I'm fighting for my city in World Battle. Join me and get a starter bonus!",
+  "share.clan.line": "HQ: {city}",
+  "share.clan.cta": "Join our clan!",
+  "share.clan.text": "⚔️ Our clan is conquering the world map in World Battle. Join us!",
+  "share.stat.rank": "clan rank",
+  "share.stat.sectors": "sectors",
+  "share.stat.level": "level",
+  "share.stat.members": "fighters",
+  "share.button": "⚔️ Play",
+  "notify.weekly": "🏆 <b>Clan «{clan}» weekly results</b>\n\nSectors captured: {won}\nLost: {lost}\nSectors held: {held}\nRank: #{rank}\nTop fighter: {best}"
 }

@@ -332,3 +332,76 @@ async def storage_full_reminders(session: AsyncSession, now: datetime) -> int:
         ):
             queued += 1
     return queued
+
+
+async def weekly_group_results(session: AsyncSession, now: datetime) -> int:
+    """Mondays: a weekly summary with the clan's best fighter in group clan chats."""
+    since = now - timedelta(days=7)
+    clans = (
+        (
+            await session.execute(
+                select(Clan).where(
+                    Clan.kind == clan_service.GROUP,
+                    Clan.tg_chat_id.is_not(None),
+                    Clan.banned.is_(False),
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    queued = 0
+    bot_username = get_settings().bot_username
+    for clan in clans:
+        won = (
+            await session.execute(
+                select(func.count())
+                .select_from(BattleLog)
+                .where(
+                    BattleLog.clan_id == clan.id,
+                    BattleLog.flipped.is_(True),
+                    BattleLog.created_at > since,
+                )
+            )
+        ).scalar_one()
+        lost = (
+            await session.execute(
+                select(func.count())
+                .select_from(BattleLog)
+                .where(
+                    BattleLog.prev_owner_clan_id == clan.id,
+                    BattleLog.flipped.is_(True),
+                    BattleLog.created_at > since,
+                )
+            )
+        ).scalar_one()
+        if won == 0 and lost == 0:
+            continue
+        best = (
+            await session.execute(
+                select(User.first_name, func.sum(BattleLog.power).label("power"))
+                .join(User, User.id == BattleLog.user_id)
+                .where(BattleLog.clan_id == clan.id, BattleLog.created_at > since)
+                .group_by(User.id, User.first_name)
+                .order_by(func.sum(BattleLog.power).desc())
+                .limit(1)
+            )
+        ).first()
+        owner = await session.get(User, clan.owner_user_id) if clan.owner_user_id else None
+        lang = pick_lang(owner.language_code if owner else "ru")
+        text = t(
+            lang,
+            "notify.weekly",
+            clan=html.escape(clan.title),
+            won=won,
+            lost=lost,
+            held=await clan_service.sectors_held(session, clan.id),
+            rank=await clan_service.clan_rank(session, clan),
+            best=html.escape(best.first_name) if best else "—",
+        )
+        link = clan_service.start_link(bot_username, clan.id)
+        await enqueue(
+            clan.tg_chat_id, text, button=url_button(t(lang, "notify.digest.button"), link)
+        )
+        queued += 1
+    return queued

@@ -7,6 +7,7 @@ from sqlalchemy import delete
 
 from app.db import get_sessionmaker
 from app.game import player_service, season_service
+from app.images import map_snapshot
 from app.models import BattleLog
 from app.worker import notifications
 
@@ -58,3 +59,19 @@ async def notify_storage_full() -> None:
     async with get_sessionmaker()() as session:
         queued = await notifications.storage_full_reminders(session, player_service.utcnow())
     log.info("storage reminders queued: %s", queued)
+
+
+async def notify_weekly_results() -> None:
+    async with get_sessionmaker()() as session:
+        queued = await notifications.weekly_group_results(session, player_service.utcnow())
+    log.info("weekly results queued: %s", queued)
+
+
+async def hourly_map_snapshot() -> None:
+    now = player_service.utcnow()
+    async with get_sessionmaker()() as session:
+        season = await season_service.get_active_season(session)
+        if season is None:
+            return
+        path = await map_snapshot.save_snapshot(session, season.number, now)
+    log.info("map snapshot saved: %s", path)

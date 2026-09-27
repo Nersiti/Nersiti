@@ -2,12 +2,13 @@ import { useCallback, useEffect, useState } from "react";
 
 import { api, ApiError } from "../api";
 import { ClanEmblem, ClanRow, JoinClanButton, kindLabel } from "../components/ClanParts";
+import ShareSheet from "../components/ShareSheet";
 import Sheet from "../components/Sheet";
 import { toast } from "../components/Toast";
 import { compactNumber, t } from "../i18n";
 import { useStore } from "../store";
 import { purchase } from "../shop";
-import { confirmDialog, haptic, openTgLink, shareLink } from "../tg";
+import { confirmDialog, haptic, openTgLink } from "../tg";
 import type { ClanDetails, ClanSummary, PlayerState, ShopInfo } from "../types";
 import { ColorSheet } from "./Shop";
 
@@ -17,6 +18,7 @@ export default function Clan() {
   const [top, setTop] = useState<ClanSummary[]>([]);
   const [promoted, setPromoted] = useState<ClanSummary[]>([]);
   const [palette, setPalette] = useState<string[] | null>(null);
+  const [sharing, setSharing] = useState(false);
   const [selected, setSelected] = useState<number | null>(null);
   const clanId = state?.clan?.id;
 
@@ -73,10 +75,7 @@ export default function Clan() {
             <p className="hint small">{t("clan.militiaHint")}</p>
           ) : (
             <div className="row-actions">
-              <button
-                className="btn"
-                onClick={() => shareLink(mine.invite_link, t("clan.inviteText", { title: mine.title }))}
-              >
+              <button className="btn" onClick={() => setSharing(true)}>
                 {t("clan.invite")}
               </button>
               <button className="btn btn-secondary" onClick={() => void leave()}>
@@ -151,6 +150,8 @@ export default function Clan() {
           <ClanRow key={c.id} clan={c} index={i} mine={c.id === clanId} onClick={() => setSelected(c.id)} />
         ))}
       </div>
+
+      <ShareSheet kind="clan" open={sharing} onClose={() => setSharing(false)} />
 
       <ColorSheet
         open={palette !== null}
