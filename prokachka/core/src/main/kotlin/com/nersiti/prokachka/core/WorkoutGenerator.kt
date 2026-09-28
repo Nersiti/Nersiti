@@ -89,6 +89,12 @@ data class Workout(
     }
 }
 
+data class PlannedResult(
+    val planned: PlannedExercise,
+    /** Состояние веса, которое сохраняется после тренировки. */
+    val weight: WeightProgress?,
+)
+
 /** Результат генерации: тренировка и состояние прогресса, которое сохраняется после её выполнения. */
 data class GeneratedWorkout(
     val workout: Workout,
@@ -138,8 +144,6 @@ class WorkoutGenerator(
         val engine = ProgressionEngine(catalog, mode)
         val template = Schedule.template(mode, day)
         val occurrence = Schedule.occurrence(mode, day)
-        val light = Schedule.isLight(day, request.cycle)
-        val sets = Schedule.sets(mode, day, request.cycle)
 
         val progress = request.progress.toMutableMap()
         val weights = request.weights.toMutableMap()
@@ -153,35 +157,68 @@ class WorkoutGenerator(
 
             val current = engine.normalize(progress.getValue(pattern), day, request.adjustment, request.excluded)
             progress[pattern] = current
-            val level = catalog[current.exerciseId]
-
-            var item = if (exercise.type == ExerciseType.WEIGHT) {
-                val available = request.inventory.weightsFor(exercise)
-                val state = weights[exercise.id] ?: engine.startWeight(exercise, available)
-                val result = engine.weighted(state, available, day, request.adjustment)
-                weights[exercise.id] = result.progress
-                PlannedExercise(
-                    exercise = exercise,
-                    pattern = pattern,
-                    sets = sets + if (result.overloaded) 1 else 0,
-                    target = result.reps,
-                    weightKg = result.progress.weightKg,
-                    slowNegative = result.overloaded,
-                )
-            } else {
-                bodyweight(exercise, pattern, level, engine.cappedTarget(current, day, request.adjustment), sets)
-            }
-
-            if (light) item = item.copy(target = max(1, (item.target * LIGHT_FACTOR).roundToInt()))
-            planned += item
+            val result = plan(request, engine, current, exercise, weights)
+            result.weight?.let { weights[it.exerciseId] = it }
+            planned += result.planned
         }
 
-        if (mode.lastSetToFailure && !light) {
-            planned.replaceAll { it.copy(lastSetToFailure = true) }
-        }
-
+        val light = Schedule.isLight(day, request.cycle)
         val workout = Workout(day, request.cycle, DayKind.WORKOUT, template, planned, mode.restSec, light = light)
         return GeneratedWorkout(workout, progress, weights)
+    }
+
+    /** Варианты для кнопки «Заменить упражнение»: тот же паттерн, хватает инвентаря, без запретов. */
+    fun alternatives(request: GenerationRequest, planned: PlannedExercise): List<Exercise> =
+        catalog.forPattern(planned.pattern)
+            .filter {
+                it.id != planned.exercise.id && request.inventory.has(it) && it.avoid.none(request.excluded::contains)
+            }
+            .sortedBy { it.difficulty }
+
+    /** Пересчитывает подходы и повторы под выбранную замену. */
+    fun replace(request: GenerationRequest, planned: PlannedExercise, exercise: Exercise): PlannedResult {
+        require(exercise.pattern == planned.pattern) { "Замена должна быть того же паттерна" }
+        val engine = ProgressionEngine(catalog, request.mode)
+        val current = engine.normalize(
+            request.progress.getValue(planned.pattern),
+            request.day,
+            request.adjustment,
+            request.excluded,
+        )
+        return plan(request, engine, current, exercise, request.weights)
+    }
+
+    private fun plan(
+        request: GenerationRequest,
+        engine: ProgressionEngine,
+        current: PatternProgress,
+        exercise: Exercise,
+        weights: Map<String, WeightProgress>,
+    ): PlannedResult {
+        val sets = Schedule.sets(request.mode, request.day, request.cycle)
+        var weight: WeightProgress? = null
+        var item = if (exercise.type == ExerciseType.WEIGHT) {
+            val available = request.inventory.weightsFor(exercise)
+            val state = weights[exercise.id] ?: engine.startWeight(exercise, available)
+            val result = engine.weighted(state, available, request.day, request.adjustment)
+            weight = result.progress
+            PlannedExercise(
+                exercise = exercise,
+                pattern = current.pattern,
+                sets = sets + if (result.overloaded) 1 else 0,
+                target = result.reps,
+                weightKg = result.progress.weightKg,
+                slowNegative = result.overloaded,
+            )
+        } else {
+            val levelTarget = engine.cappedTarget(current, request.day, request.adjustment)
+            bodyweight(exercise, current.pattern, catalog[current.exerciseId], levelTarget, sets)
+        }
+
+        val light = Schedule.isLight(request.day, request.cycle)
+        if (light) item = item.copy(target = max(1, (item.target * LIGHT_FACTOR).roundToInt()))
+        if (request.mode.lastSetToFailure && !light) item = item.copy(lastSetToFailure = true)
+        return PlannedResult(item, weight)
     }
 
     /**

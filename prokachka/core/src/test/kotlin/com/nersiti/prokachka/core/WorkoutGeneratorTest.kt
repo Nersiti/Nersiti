@@ -156,4 +156,24 @@ class WorkoutGeneratorTest {
         assertEquals(2, light.exercises.first { !it.compensated }.sets)
         assertFalse(normal.light)
     }
+
+    @Test
+    fun `замена упражнения пересчитывает цель`() {
+        val inventory = Inventory(setOf(Equipment.BAR, Equipment.DUMBBELLS), dumbbellsKg = listOf(8.0))
+        val request = request(Mode.MEDIUM, 11, inventory)
+        val workout = generator.generate(request).workout
+        val push = workout.exercises.first()
+
+        val alternatives = generator.alternatives(request, push)
+        assertTrue(alternatives.isNotEmpty())
+        assertTrue(alternatives.none { it.id == push.exercise.id || it.pattern != push.pattern })
+
+        val knee = generator.replace(request, push, ExerciseCatalog.default["pushup_knee"]).planned
+        assertTrue(knee.compensated)
+        assertEquals(4, knee.sets)
+        assertTrue(knee.target > push.target)
+
+        val press = generator.replace(request, workout.exercises[2], ExerciseCatalog.default["db_lateral_raise"])
+        assertEquals(8.0, press.weight?.weightKg)
+    }
 }
