@@ -24,6 +24,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -129,6 +130,7 @@ class ProgressViewModel @Inject constructor(
 
 private val tabTitles = listOf("Фото", "Графики", "Календарь", "Ачивки")
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProgressScreen(viewModel: ProgressViewModel = hiltViewModel()) {
     val ui by viewModel.ui.collectAsStateWithLifecycle()
